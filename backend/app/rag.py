@@ -136,8 +136,11 @@ def answer(message: str, language: str | None = None) -> dict[str, Any]:
     if not hits:
         return _fallback_response(lang)
 
-    # ── Product cards — only for demanded products above score floor ───────
-    product_cards = _extract_product_cards(hits, threshold=settings.PRODUCT_FLOOR)
+    # ── Product cards — conversational queries (comparisons, indirect) get a
+    # lower threshold so both referenced products are returned even when the
+    # fused score is moderate.  All other types use PRODUCT_FLOOR.
+    card_threshold = 0.20 if msg_type == "conversational" else settings.PRODUCT_FLOOR
+    product_cards = _extract_product_cards(hits, threshold=card_threshold)
 
     # ── Route: skip LLM for pure lookup ────────────────────────────────────
     if msg_type == "lookup" and product_cards:

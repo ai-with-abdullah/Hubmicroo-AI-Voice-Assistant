@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = 5
     BM25_WEIGHT: float = 0.3         # weight for sparse BM25 score
     DENSE_WEIGHT: float = 0.7        # weight for dense cosine score
-    PRODUCT_FLOOR: float = 0.55      # min fused score to show a product card
+    PRODUCT_FLOOR: float = 0.35      # min fused score to show a product card
     MAX_PRODUCT_CARDS: int = 3
 
     # ── Semantic cache ────────────────────────────────────────────────────
