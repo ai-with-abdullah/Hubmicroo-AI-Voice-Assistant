@@ -61,15 +61,18 @@ def retrieve(
     query: str,
     top_k: int | None = None,
     doc_type: str | None = None,
+    query_vec: list[float] | None = None,
 ) -> list[dict[str, Any]]:
     """Hybrid retrieve. Returns ranked list of {score, payload} dicts.
 
     *doc_type* filters to 'product', 'page', or None (all).
+    *query_vec* may be supplied by the caller to avoid a duplicate embed call.
     """
     k = top_k or settings.RETRIEVAL_TOP_K
     fetch_k = k * 3  # fetch more candidates to allow re-ranking
 
-    query_vec = embed_text(query)
+    if query_vec is None:
+        query_vec = embed_text(query)
 
     # ── Dense retrieval ────────────────────────────────────────────────────
     dense_hits = store.search(query_vec, top_k=fetch_k, doc_type=doc_type)

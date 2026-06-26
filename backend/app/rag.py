@@ -158,8 +158,8 @@ def answer(message: str, language: str | None = None) -> dict[str, Any]:
             "cached": True,
         }
 
-    # ── Retrieval ──────────────────────────────────────────────────────────
-    hits = retrieve(search_query, top_k=settings.RETRIEVAL_TOP_K)
+    # ── Retrieval — reuse the vector already computed for the cache check ─────
+    hits = retrieve(search_query, top_k=settings.RETRIEVAL_TOP_K, query_vec=query_vec)
     if not hits:
         return _fallback_response(lang)
 

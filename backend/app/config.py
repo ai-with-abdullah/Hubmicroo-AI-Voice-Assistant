@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "qwen3:4b"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLM_TEMPERATURE: float = 0.1
-    LLM_NUM_PREDICT: int = 512
+    LLM_NUM_PREDICT: int = 200
     LLM_THINK: bool = False          # keep False for fast/non-thinking mode
 
     # ── Embeddings ────────────────────────────────────────────────────────

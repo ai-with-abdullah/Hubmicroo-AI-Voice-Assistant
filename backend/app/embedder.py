@@ -15,14 +15,22 @@ settings = get_settings()
 @lru_cache(maxsize=1)
 def _get_model():
     from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+    import torch  # noqa: PLC0415
 
-    logger.info("Loading BGE-M3 via sentence-transformers on device=%s …", settings.EMBED_DEVICE)
+    device = settings.EMBED_DEVICE
+    # Auto-upgrade to CUDA when available and config was left at the default "cpu".
+    # On Kaggle T4 this cuts per-call latency from ~3 s to ~50 ms.
+    if device == "cpu" and torch.cuda.is_available():
+        device = "cuda"
+        logger.info("CUDA detected — auto-upgrading EMBED_DEVICE cpu → cuda")
+
+    logger.info("Loading BGE-M3 via sentence-transformers on device=%s …", device)
     model = SentenceTransformer(
         settings.EMBED_MODEL,
-        device=settings.EMBED_DEVICE,
+        device=device,
         trust_remote_code=True,
     )
-    logger.info("BGE-M3 ready")
+    logger.info("BGE-M3 ready on %s", device)
     return model
 
 
