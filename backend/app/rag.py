@@ -51,11 +51,17 @@ _OOB_SIGNALS = re.compile(
 
 
 def _rewrite_query(message: str) -> str:
-    """Spell-correct, translate, and condense any query to a tight English search intent.
+    """Spell-correct and condense query to a tight English search intent.
 
-    Always calls the LLM so that typo-heavy or short non-English queries are
-    corrected before embedding — crucial for BM25 which only covers English text.
+    Skips the LLM for short (≤8 word) pure-ASCII queries — BGE-M3 handles minor
+    typos and keyword queries well enough without the extra Ollama round-trip.
+    Non-ASCII (Arabic / Urdu script) queries are always translated to English so
+    that BM25 (English-only corpus) can contribute a score.
     """
+    words = message.split()
+    # Fast path: short ASCII query — no LLM needed
+    if len(words) <= 8 and message.isascii():
+        return message
     try:
         raw = generate(_REWRITE_PROMPT.format(msg=message)).strip()
         if not raw:
