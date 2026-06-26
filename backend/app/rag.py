@@ -16,6 +16,7 @@ _SYSTEM = """You are the shopping assistant for the Hubmicroo online store.
 STRICT RULES — follow exactly:
 - Use ONLY the information in WEBSITE INFO and MATCHING PRODUCTS below.
 - You may ONLY mention products that appear in MATCHING PRODUCTS, and you MUST use their EXACT names and EXACT prices. NEVER invent product names, brands, models, or prices. Do not use any product knowledge from outside this list.
+- If MATCHING PRODUCTS is empty, do NOT mention, list, or suggest any products. Just answer the question from WEBSITE INFO, or chat briefly. Never volunteer a product list the customer did not ask for.
 - If MATCHING PRODUCTS is empty and the answer is not in WEBSITE INFO, say you don't have that and suggest contacting Hubmicroo support.
 - Reply in {language} only.
 - Be short and friendly — this is read aloud. Mention at most {spoken} products.
@@ -43,13 +44,22 @@ def _context(chunks) -> str:
     return "\n".join(blocks)
 
 
-# Greetings / small talk in EN/UR/AR. These should NOT trigger a product search.
+# Greetings / small talk in EN/UR/AR (script + romanized). NOT product searches.
 _GREETINGS = (
+    # English
     "hello", "hi ", "hey", "how are you", "good morning", "good evening",
-    "good afternoon", "thanks", "thank you", "salam", "assalam", "aoa",
-    "whats up", "what's up", "who are you",
+    "good afternoon", "thanks", "thank you", "whats up", "what's up",
+    "who are you", "good night",
+    # Romanized Urdu (Latin letters — what people often type)
+    "salam", "assalam", "asalam", "aoa", "kaise ho", "kaise hain", "kaise hai",
+    "kase ho", "kese ho", "kasy ho", "kya haal", "kya hal", "kia haal", "shukria",
+    "shukriya", "theek ho", "kaisa hai", "ap kaise", "aap kaise",
+    # Romanized Arabic
+    "kaif halak", "kaif halik", "shukran", "marhaba", "ahlan", "sabah",
+    # Urdu script
     "السلام علیکم", "اسلام علیکم", "سلام", "آپ کیسے ہیں", "کیسے ہو", "کیسے ہیں",
     "ہیلو", "شکریہ", "کیا حال",
+    # Arabic script
     "السلام عليكم", "مرحبا", "اهلا", "أهلا", "كيف حالك", "كيف الحال", "شكرا",
     "صباح الخير", "مساء الخير",
 )
@@ -84,6 +94,10 @@ def answer(message: str, language: str = None) -> dict:
         return {"answer": str(e), "language": lang, "products": [], "sources": [],
                 "error": True}
 
+    # Website text (policies/FAQ/about) is kept separate from products, so the
+    # model only talks products when there are MATCHING PRODUCTS.
+    page_chunks = [c for c in chunks if c["meta"].get("type") != "product"]
+
     # 2) Product cards — only when genuinely relevant:
     #    a) product chunks retrieved with a strong score, or
     #    b) a strong fuzzy name/category match. Avoids dumping products on
@@ -103,8 +117,8 @@ def answer(message: str, language: str = None) -> dict:
     products = products[:config.VISUAL_RESULTS]
 
     # 3) Generate the grounded spoken answer.
-    # Only give up if we have neither website text nor matching products.
-    if not chunks and not products:
+    # Give up only if we have neither website text nor matching products.
+    if not page_chunks and not products:
         fallback = {
             "en": "Sorry, I couldn't find that on our store. Please contact Hubmicroo support.",
             "ur": "معاف کیجیے، یہ ہمارے اسٹور پر نہیں ملا۔ براہ کرم ہب مائیکرو سپورٹ سے رابطہ کریں۔",
@@ -115,12 +129,12 @@ def answer(message: str, language: str = None) -> dict:
 
     system = _SYSTEM.format(language=config.LANG_NAMES[lang],
                             spoken=config.SPOKEN_RESULTS)
-    # Real, authoritative product data goes in explicitly so the model can't
-    # invent products/prices even when retrieval is weak.
+    # Products are passed only via MATCHING PRODUCTS, so the model can't invent
+    # them and won't volunteer products when the list is empty.
     user = (
-        f"WEBSITE INFO:\n{_context(chunks) or '(none)'}\n\n"
-        f"MATCHING PRODUCTS (use ONLY these, with exact names and prices):\n"
-        f"{_products_block(products)}\n\n"
+        f"WEBSITE INFO:\n{_context(page_chunks) or '(none)'}\n\n"
+        f"MATCHING PRODUCTS (use ONLY these, with exact names and prices; "
+        f"if empty, do NOT mention any products):\n{_products_block(products)}\n\n"
         f"CUSTOMER QUESTION: {message}"
     )
     try:
@@ -129,5 +143,5 @@ def answer(message: str, language: str = None) -> dict:
         return {"answer": str(e), "language": lang, "products": products,
                 "sources": [], "error": True}
 
-    sources = list({c["meta"].get("url") for c in chunks if c["meta"].get("url")})
+    sources = list({c["meta"].get("url") for c in page_chunks if c["meta"].get("url")})
     return {"answer": text, "language": lang, "products": products, "sources": sources}
