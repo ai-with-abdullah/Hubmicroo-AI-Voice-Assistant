@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Secrets & local config
+.env
+
+# Generated at runtime (rebuilt on each server / Kaggle run)
+backend/data/vector/
+
+# Logs & OS
+*.log
+.DS_Store
+
+# Notebook checkpoints
+.ipynb_checkpoints/

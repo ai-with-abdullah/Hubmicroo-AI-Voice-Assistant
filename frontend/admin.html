@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hubmicroo — Admin</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; background: #f1f5f9; margin: 0; color: #0f172a; }
+    header { background: linear-gradient(135deg,#6d28d9,#2563eb); color: #fff; padding: 22px 20px; }
+    .wrap { max-width: 720px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    h2 { margin-top: 0; font-size: 17px; }
+    label { display: block; font-size: 13px; margin: 10px 0 4px; color: #475569; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 9px 11px;
+      border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { margin-top: 14px; background: linear-gradient(135deg,#6d28d9,#2563eb);
+      color: #fff; border: none; padding: 11px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .ghost { background: #e2e8f0; color: #0f172a; }
+    .stat { font-size: 28px; font-weight: 700; color: #2563eb; }
+    .msg { margin-top: 12px; font-size: 14px; }
+    .ok { color: #16a34a; } .err { color: #dc2626; }
+    .stats { display: flex; gap: 30px; }
+  </style>
+</head>
+<body>
+  <header><b>Hubmicroo Admin</b> — products & AI index</header>
+  <div class="wrap">
+
+    <div class="card">
+      <h2>Status</h2>
+      <div class="stats">
+        <div><div class="stat" id="sChunks">–</div><div>chunks indexed</div></div>
+        <div><div class="stat" id="sProducts">–</div><div>products</div></div>
+        <div><div class="stat" id="sLLM">–</div><div>LLM ready</div></div>
+      </div>
+      <button class="ghost" onclick="refresh()">Refresh</button>
+      <button onclick="reindex()">Re-index everything</button>
+      <div class="msg" id="reMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Add product (auto-indexed)</h2>
+      <p style="font-size:13px;color:#64748b">Adding a product indexes just that item — no full rebuild, no training.</p>
+      <div class="row">
+        <div><label>ID</label><input id="id" placeholder="P010"/></div>
+        <div><label>Name (English)</label><input id="name" placeholder="Wireless Earbuds"/></div>
+      </div>
+      <div class="row">
+        <div><label>Name (Urdu)</label><input id="name_ur" dir="rtl"/></div>
+        <div><label>Name (Arabic)</label><input id="name_ar" dir="rtl"/></div>
+      </div>
+      <div class="row">
+        <div><label>Price</label><input id="price" type="number" placeholder="3500"/></div>
+        <div><label>Currency</label><input id="currency" value="PKR"/></div>
+      </div>
+      <div class="row">
+        <div><label>Category</label><input id="category" placeholder="Audio"/></div>
+        <div><label>Brand</label><input id="brand" placeholder="SoundMax"/></div>
+      </div>
+      <label>Image URL</label><input id="image" placeholder="https://..."/>
+      <label>Product URL</label><input id="url" placeholder="https://www.hubmicroo.com/product/P010"/>
+      <label>Features (comma separated)</label><input id="features" placeholder="wireless, waterproof, 8h battery"/>
+      <label>Description</label><textarea id="description" rows="2"></textarea>
+      <label><input type="checkbox" id="in_stock" checked style="width:auto"/> In stock</label>
+      <button onclick="addProduct()">Add & index product</button>
+      <div class="msg" id="addMsg"></div>
+    </div>
+  </div>
+
+<script>
+function refresh() {
+  fetch("/api/health").then(r=>r.json()).then(h=>{
+    document.getElementById("sChunks").textContent = h.chunks_indexed ?? "–";
+    document.getElementById("sLLM").textContent = h.llm_ready ? "✓" : "✗";
+  });
+  fetch("/api/stats").then(r=>r.json()).then(s=>{
+    document.getElementById("sProducts").textContent = s.products ?? "–";
+  });
+}
+function reindex() {
+  const m = document.getElementById("reMsg");
+  m.textContent = "Re-indexing..."; m.className = "msg";
+  fetch("/api/reindex", {method:"POST"}).then(r=>r.json()).then(d=>{
+    m.textContent = d.detail ? ("Error: "+d.detail)
+      : ("Done. " + d.products + " products, " + d.chunks + " chunks.");
+    m.className = "msg " + (d.detail ? "err" : "ok");
+    refresh();
+  }).catch(()=>{ m.textContent="Failed"; m.className="msg err"; });
+}
+function addProduct() {
+  const g = id => document.getElementById(id).value.trim();
+  const body = {
+    id:g("id"), name:g("name"), name_ur:g("name_ur"), name_ar:g("name_ar"),
+    price:parseFloat(g("price")||"0"), currency:g("currency")||"PKR",
+    category:g("category"), brand:g("brand"), image:g("image"), url:g("url"),
+    description:g("description"),
+    features:g("features")?g("features").split(",").map(s=>s.trim()):[],
+    in_stock:document.getElementById("in_stock").checked
+  };
+  const m = document.getElementById("addMsg");
+  m.textContent="Adding..."; m.className="msg";
+  fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
+    m.textContent = d.detail ? ("Error: "+d.detail) : ("Added "+d.added+" and indexed.");
+    m.className = "msg " + (d.detail ? "err":"ok");
+    refresh();
+  }).catch(()=>{ m.textContent="Failed"; m.className="msg err"; });
+}
+refresh();
+</script>
+</body>
+</html>

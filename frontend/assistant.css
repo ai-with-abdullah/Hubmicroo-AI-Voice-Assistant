@@ -1,0 +1,80 @@
+/* Hubmicroo Voice Assistant widget styles */
+.hm-fab {
+  position: fixed; right: 22px; bottom: 22px; z-index: 99998;
+  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 26px; color: #fff; background: linear-gradient(135deg,#6d28d9,#2563eb);
+  box-shadow: 0 8px 24px rgba(37,99,235,.45); transition: transform .15s;
+}
+.hm-fab:hover { transform: scale(1.08); }
+
+.hm-modal {
+  position: fixed; right: 22px; bottom: 92px; z-index: 99999;
+  width: 380px; max-width: calc(100vw - 24px);
+  font-family: system-ui, "Segoe UI", Arial, sans-serif;
+}
+.hm-hidden { display: none; }
+
+.hm-card {
+  display: flex; flex-direction: column; height: 560px; max-height: 80vh;
+  background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25); border: 1px solid #e5e7eb;
+}
+.hm-rtl { direction: rtl; }
+
+.hm-head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 14px;
+  background: linear-gradient(135deg,#6d28d9,#2563eb); color: #fff;
+}
+.hm-title { font-weight: 600; flex: 1; font-size: 15px; }
+.hm-lang { border: none; border-radius: 6px; padding: 3px 6px; font-size: 13px; }
+.hm-mute, .hm-close { background: transparent; border: none; color: #fff;
+  font-size: 16px; cursor: pointer; }
+
+.hm-body { flex: 1; overflow-y: auto; padding: 14px; background: #f8fafc; }
+.hm-bubble { max-width: 85%; padding: 9px 13px; border-radius: 14px;
+  margin: 6px 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.hm-user { background: #2563eb; color: #fff; margin-inline-start: auto;
+  border-bottom-right-radius: 4px; }
+.hm-bot { background: #fff; color: #1f2937; border: 1px solid #e5e7eb;
+  margin-inline-end: auto; border-bottom-left-radius: 4px; }
+.hm-rtl .hm-user { border-radius: 14px; border-bottom-left-radius: 4px; }
+.hm-typing { letter-spacing: 2px; animation: hm-blink 1s infinite; }
+@keyframes hm-blink { 50% { opacity: .3; } }
+
+.hm-products { display: flex; gap: 8px; overflow-x: auto; padding: 0 14px;
+  background: #f8fafc; }
+.hm-products:empty { padding: 0; }
+.hm-pcard { flex: 0 0 130px; text-decoration: none; color: inherit;
+  border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px; background: #fff;
+  margin-bottom: 8px; }
+.hm-pcard img { width: 100%; height: 90px; object-fit: cover; border-radius: 6px; }
+.hm-pname { font-size: 12px; font-weight: 600; margin-top: 5px; }
+.hm-pprice { font-size: 13px; color: #2563eb; font-weight: 700; }
+.hm-in { font-size: 11px; color: #16a34a; }
+.hm-out { font-size: 11px; color: #dc2626; }
+
+.hm-micwrap { padding: 8px 14px; min-height: 26px; text-align: center; }
+.hm-wave { display: inline-flex; gap: 4px; height: 22px; align-items: center;
+  opacity: .25; }
+.hm-wave i { width: 4px; height: 6px; background: #2563eb; border-radius: 2px; }
+.hm-wave.hm-active { opacity: 1; }
+.hm-wave.hm-active i { animation: hm-bounce .8s infinite ease-in-out; }
+.hm-wave.hm-active i:nth-child(2) { animation-delay: .15s; }
+.hm-wave.hm-active i:nth-child(3) { animation-delay: .3s; }
+.hm-wave.hm-active i:nth-child(4) { animation-delay: .45s; }
+.hm-wave.hm-active i:nth-child(5) { animation-delay: .6s; }
+@keyframes hm-bounce { 0%,100% { height: 6px; } 50% { height: 20px; } }
+.hm-transcript { font-size: 13px; color: #6b7280; min-height: 18px; margin-top: 4px; }
+
+.hm-input { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid #eee; }
+.hm-text { flex: 1; border: 1px solid #d1d5db; border-radius: 20px;
+  padding: 9px 14px; font-size: 14px; outline: none; }
+.hm-mic, .hm-send { border: none; border-radius: 50%; width: 40px; height: 40px;
+  cursor: pointer; font-size: 16px; color: #fff;
+  background: linear-gradient(135deg,#6d28d9,#2563eb); }
+
+/* Full-screen overlay on phones */
+@media (max-width: 480px) {
+  .hm-modal { right: 0; bottom: 0; width: 100vw; max-width: 100vw; }
+  .hm-card { height: 100vh; max-height: 100vh; border-radius: 0; }
+}

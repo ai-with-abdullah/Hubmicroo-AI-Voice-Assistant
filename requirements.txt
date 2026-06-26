@@ -1,0 +1,15 @@
+# ---- Hubmicroo Voice Assistant — Python dependencies ----
+# Lean stack. Voice runs in the browser (no models to train or host).
+# The backend only does LIVE product search against your real website.
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+requests==2.32.3          # fetch live catalogue from your website
+rapidfuzz==3.9.7          # fast fuzzy product matching (no ML, no training)
+numpy==1.26.4             # vector store math (cosine similarity)
+
+# ---- OPTIONAL: private self-hosted voice (only if you turn it on later) ----
+# Install with:  pip install -r requirements-selfhosted.txt
+# This swaps browser voice for fully-private Whisper (speech->text) and
+# Meta MMS-TTS (text->speech). Still NO training — models are pretrained.

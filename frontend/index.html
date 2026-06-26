@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hubmicroo — Demo Storefront</title>
+  <link rel="stylesheet" href="/static/assistant.css" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #f1f5f9; color: #0f172a; }
+    header { background: linear-gradient(135deg,#6d28d9,#2563eb); color: #fff; padding: 28px 20px; }
+    header h1 { margin: 0; font-size: 24px; }
+    header p { margin: 6px 0 0; opacity: .9; }
+    .wrap { max-width: 900px; margin: 30px auto; padding: 0 16px; }
+    .hint { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; }
+    .hint code { background: #f1f5f9; padding: 2px 6px; border-radius: 5px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 16px; margin-top: 24px; }
+    .p { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
+    .p b { font-size: 14px; } .p .pr { color: #2563eb; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hubmicroo</h1>
+    <p>Demo storefront — tap the 🎤 button at the bottom-right and ask in English, اردو or العربية.</p>
+  </header>
+  <div class="wrap">
+    <div class="hint">
+      Try saying or typing: <i>“Do you have wireless headphones under 5000?”</i>,
+      <i>“کیا آپ کے پاس بلوٹوتھ اسپیکر ہے؟”</i>, or <i>“ما هي سياسة الإرجاع؟”</i>.<br/>
+      Admin panel: <a href="/admin">/admin</a> &nbsp;·&nbsp; Health: <a href="/api/health">/api/health</a>
+    </div>
+    <div class="grid">
+      <div class="p"><b>Wireless Bluetooth Headphones</b><div class="pr">4500 PKR</div></div>
+      <div class="p"><b>Smart Watch Series 7</b><div class="pr">8900 PKR</div></div>
+      <div class="p"><b>Portable Bluetooth Speaker</b><div class="pr">3200 PKR</div></div>
+      <div class="p"><b>USB-C Fast Charger 65W</b><div class="pr">2100 PKR</div></div>
+    </div>
+  </div>
+
+  <!-- The widget. On your real site, host these two files and add these tags. -->
+  <script>window.HUBMICROO_API_BASE = "";</script>
+  <script src="/static/assistant.js"></script>
+</body>
+</html>

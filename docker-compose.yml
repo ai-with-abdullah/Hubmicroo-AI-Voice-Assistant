@@ -1,0 +1,33 @@
+# One command to run everything on the client's server: `docker compose up`
+# Service 1: Ollama (the self-hosted LLM brain). Service 2: the FastAPI backend.
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    # For a GPU server, install the NVIDIA container toolkit and uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - LLM_MODEL=qwen2.5:3b
+      - EMBED_MODEL=bge-m3
+    depends_on:
+      - ollama
+    volumes:
+      - ./backend/data:/app/backend/data   # persist catalogue + vector index
+
+volumes:
+  ollama_models:
