@@ -20,7 +20,16 @@ settings = get_settings()
 
 @lru_cache(maxsize=1)
 def _client() -> QdrantClient:
-    """Return a singleton QdrantClient (created once per process)."""
+    """Return a singleton QdrantClient.
+
+    Modes (controlled by config):
+      - QDRANT_LOCAL_PATH set → embedded/local mode (no server; ideal for Kaggle/CI)
+      - QDRANT_LOCAL_PATH empty → URL mode (connects to running Qdrant server)
+    """
+    if settings.QDRANT_LOCAL_PATH:
+        logger.info("Qdrant: embedded mode at %s", settings.QDRANT_LOCAL_PATH)
+        return QdrantClient(path=settings.QDRANT_LOCAL_PATH)
+    logger.info("Qdrant: server mode at %s", settings.QDRANT_URL)
     return QdrantClient(url=settings.QDRANT_URL, timeout=30)
 
 

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # ── Vector store (Qdrant) ─────────────────────────────────────────────
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION: str = "hubmicroo"
+    # Set QDRANT_LOCAL_PATH to run in embedded mode (no server needed).
+    # Useful for Kaggle / CI / local testing without running a Qdrant container.
+    # Leave blank to use the URL server mode (default for Docker production).
+    QDRANT_LOCAL_PATH: str = ""
 
     # ── Retrieval ─────────────────────────────────────────────────────────
     RETRIEVAL_TOP_K: int = 5
