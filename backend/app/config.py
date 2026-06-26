@@ -65,7 +65,8 @@ RETRIEVE_FLOOR = float(os.getenv("RETRIEVE_FLOOR", "0.30"))  # cosine floor
 # ---- Product card display ----------------------------------------------
 SPOKEN_RESULTS = int(os.getenv("SPOKEN_RESULTS", "3"))
 VISUAL_RESULTS = int(os.getenv("VISUAL_RESULTS", "8"))
-MATCH_FLOOR = int(os.getenv("MATCH_FLOOR", "55"))       # 0-100 fuzzy score floor
+MATCH_FLOOR = int(os.getenv("MATCH_FLOOR", "72"))      # 0-100 fuzzy floor (higher = stricter)
+PRODUCT_FLOOR = float(os.getenv("PRODUCT_FLOOR", "0.45"))  # cosine floor for showing a product card
 DEFAULT_CURRENCY = os.getenv("DEFAULT_CURRENCY", "PKR")
 
 LANG_NAMES = {"en": "English", "ur": "Urdu", "ar": "Arabic"}

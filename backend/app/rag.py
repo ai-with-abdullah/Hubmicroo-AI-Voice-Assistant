@@ -43,9 +43,38 @@ def _context(chunks) -> str:
     return "\n".join(blocks)
 
 
+# Greetings / small talk in EN/UR/AR. These should NOT trigger a product search.
+_GREETINGS = (
+    "hello", "hi ", "hey", "how are you", "good morning", "good evening",
+    "good afternoon", "thanks", "thank you", "salam", "assalam", "aoa",
+    "whats up", "what's up", "who are you",
+    "السلام علیکم", "اسلام علیکم", "سلام", "آپ کیسے ہیں", "کیسے ہو", "کیسے ہیں",
+    "ہیلو", "شکریہ", "کیا حال",
+    "السلام عليكم", "مرحبا", "اهلا", "أهلا", "كيف حالك", "كيف الحال", "شكرا",
+    "صباح الخير", "مساء الخير",
+)
+_GREETING_REPLY = {
+    "en": "Hello! 👋 How can I help you with Hubmicroo products today?",
+    "ur": "السلام علیکم! میں ہب مائیکرو کی پروڈکٹس میں آپ کی کیسے مدد کر سکتا ہوں؟",
+    "ar": "مرحبًا! كيف يمكنني مساعدتك في منتجات هب مايكرو اليوم؟",
+}
+
+
+def _is_greeting(message: str) -> bool:
+    m = f" {message.strip().lower()} "
+    if len(message.strip()) > 40:        # long messages are real questions
+        return False
+    return any(g in m for g in _GREETINGS)
+
+
 def answer(message: str, language: str = None) -> dict:
     """Return {answer, language, products, sources}."""
     lang = language if language in config.LANG_NAMES else detect_language(message)
+
+    # 0) Greetings / small talk -> friendly reply, NO product search.
+    if _is_greeting(message):
+        return {"answer": _GREETING_REPLY[lang], "language": lang,
+                "products": [], "sources": []}
 
     # 1) Retrieve relevant knowledge from across the whole site.
     try:
@@ -55,15 +84,19 @@ def answer(message: str, language: str = None) -> dict:
         return {"answer": str(e), "language": lang, "products": [], "sources": [],
                 "error": True}
 
-    # 2) Product cards: prefer products surfaced by retrieval, then live search.
+    # 2) Product cards — only when genuinely relevant:
+    #    a) product chunks retrieved with a strong score, or
+    #    b) a strong fuzzy name/category match. Avoids dumping products on
+    #       unrelated questions ("return policy", "where are you", etc.).
     products, seen = [], set()
     for c in chunks:
-        if c["meta"].get("type") == "product":
+        if (c["meta"].get("type") == "product"
+                and c.get("score", 0) >= config.PRODUCT_FLOOR):
             p = c["meta"]["product"]
             if p["id"] not in seen:
                 products.append(p)
                 seen.add(p["id"])
-    for p in store.search_products(message):
+    for p in store.search_products(message):     # uses raised MATCH_FLOOR
         if p["id"] not in seen:
             products.append(p)
             seen.add(p["id"])

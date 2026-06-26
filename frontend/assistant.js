@@ -72,6 +72,7 @@
   function sendMessage(message) {
     if (!message || !message.trim()) return;
     addBubble(message, "user");
+    setTranscript("");          // clear the live voice transcript once sent
     setProcessing(true);
     fetch(API_BASE + "/chat", {
       method: "POST",
