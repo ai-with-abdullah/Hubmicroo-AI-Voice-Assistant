@@ -79,6 +79,12 @@ class SemanticCache:
         self._store[key] = _CacheEntry(answer=answer, products=products, lang=lang)
         self._store.move_to_end(key)
 
+    def clear(self) -> int:
+        """Flush all entries. Returns the number of entries removed."""
+        n = len(self._store)
+        self._store.clear()
+        return n
+
     def stats(self) -> dict[str, int]:
         return {"size": len(self._store), "max_size": self._max_size}
 

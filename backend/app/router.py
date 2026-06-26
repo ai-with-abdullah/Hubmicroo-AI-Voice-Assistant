@@ -34,8 +34,10 @@ _CONVO_PATTERNS = re.compile(
 )
 
 # Greetings — ultra-short path, no retrieval needed
+# Note: "السلام عليكم" must come before "السلام" so the longer phrase matches first
 _GREETING = re.compile(
-    r"^\s*(hi|hello|hey|salam|salaam|السلام|مرحبا|اسلام|"
+    r"^\s*(السلام\s+عليكم|وعليكم\s+السلام|"
+    r"hi|hello|hey|salam|salaam|السلام|مرحبا|اسلام|"
     r"aoa|assalam|walaikum|good\s*(morning|evening|afternoon)|"
     r"kaise hain|kya haal|theek hain?|aap kaise)\W*$",
     re.IGNORECASE,

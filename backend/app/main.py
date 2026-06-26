@@ -208,6 +208,14 @@ def health():
     }
 
 
+@app.post("/api/cache/clear")
+def cache_clear():
+    """Flush the in-memory semantic cache (useful before eval runs)."""
+    from .cache import get_cache
+    get_cache().clear()
+    return {"status": "cleared"}
+
+
 @app.get("/api/stats")
 def stats():
     try:

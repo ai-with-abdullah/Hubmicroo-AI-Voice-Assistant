@@ -70,6 +70,14 @@ def main(base_url: str, out_path: str | None) -> None:
     print(f"  Hubmicroo Eval — {len(cases)} cases against {base_url}")
     print(f"{'─'*60}\n")
 
+    # Flush semantic cache so stale entries from previous runs don't pollute results
+    with httpx.Client() as client:
+        try:
+            r = client.post(f"{base_url}/api/cache/clear", timeout=5.0)
+            print(f"  Cache flushed before eval ({r.json()})\n")
+        except Exception as exc:
+            print(f"  Cache flush skipped: {exc}\n")
+
     with httpx.Client() as client:
         for i, case in enumerate(cases, 1):
             try:
