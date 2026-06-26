@@ -42,10 +42,9 @@ _REWRITE_PROMPT = (
 
 # Known out-of-catalogue items — when detected, suppress product cards so the
 # LLM can tell the user we don't carry them without showing a false match.
-# Use iphones? (optional plural s) so "iPhones" also matches.
 _OOB_SIGNALS = re.compile(
-    r'\b(iphones?|ipads?|macbooks?|airpods?|'
-    r'samsung\s+(phone|galaxy)|android\s+phone|'
+    r'\b(iphones?|ipads?|macbooks?|airpods?|smartphones?|'
+    r'samsung\s+(phone|galaxy)|android\s+(phone|smartphone)|'
     r'gaming\s+laptop|windows\s+laptop|desktop\s+pc|'
     r'playstation|ps[45]|xbox|nintendo)\b',
     re.IGNORECASE,
@@ -55,14 +54,15 @@ _OOB_SIGNALS = re.compile(
 def _rewrite_query(message: str) -> str:
     """Spell-correct and condense query to a tight English search intent.
 
-    Skips the LLM for short (≤8 word) pure-ASCII queries that have BM25 matches
+    Skips the LLM for short (3–8 word) pure-ASCII queries that have BM25 matches
     (i.e. clean English keywords the corpus already understands).
-    Triggers the LLM when: query is long, contains non-ASCII, OR every word is
-    unknown to BM25 — the last condition catches heavy-typo queries like
-    "wrreless hedphons" where BM25 gives zero coverage.
+    Triggers the LLM when: query is long, contains non-ASCII, every word is unknown
+    to BM25 (heavy typos), OR the query is ≤2 words — at that length a single typo
+    ruins the whole query and the LLM cost is minimal.
     """
     words = message.split()
-    if len(words) <= 8 and message.isascii() and has_bm25_matches(message):
+    # ≤2-word queries: always rewrite — one bad token wipes BM25 and dense both.
+    if len(words) >= 3 and len(words) <= 8 and message.isascii() and has_bm25_matches(message):
         return message  # clean short ASCII query — skip LLM round-trip
     try:
         raw = generate(_REWRITE_PROMPT.format(msg=message)).strip()
@@ -163,11 +163,12 @@ def answer(message: str, language: str | None = None) -> dict[str, Any]:
     # ── Retrieval — reuse the vector already computed for the cache check ────
     hits = retrieve(search_query, top_k=settings.RETRIEVAL_TOP_K, query_vec=query_vec)
 
-    # Dual retrieval: when the rewrite changed the query, also search with the
-    # ORIGINAL message so product keywords dropped by the LLM (e.g. "headphones"
-    # from "whats the warrenty on the bluethooth headphnes…") are still found via
-    # BGE-M3's typo-tolerant dense similarity.  Merge by keeping best score.
-    if search_query != message:
+    # Dual retrieval: for long queries or whenever the rewrite changed the input,
+    # also search with the ORIGINAL message.  This recovers product keywords the
+    # LLM may have dropped (e.g. "headphnes" → stripped) AND handles the case where
+    # the rewrite fell back to the original but still contains typos.
+    # On T4 GPU the extra embed+retrieve costs ~150 ms — negligible.
+    if search_query != message or len(message.split()) > 8:
         orig_hits = retrieve(message, top_k=settings.RETRIEVAL_TOP_K)
         merged: dict[str, tuple[float, dict]] = {}
         for h in hits + orig_hits:

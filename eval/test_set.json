@@ -446,5 +446,36 @@
     "note": "completely off-topic — should deflect gracefully",
     "expected_product_ids": [],
     "expected_policy": null
-  }
+  },
+
+  {"id":"en-019","lang":"en","query":"Do you have a USB condenser microphone for podcasting?","type":"product_lookup","note":"podcast mic query — p011","expected_product_ids":["p011"],"expected_policy":null},
+  {"id":"en-020","lang":"en","query":"outdoor waterproof bluetooth speaker","type":"product_lookup","note":"feature-based speaker query — p014","expected_product_ids":["p014"],"expected_policy":null},
+  {"id":"en-021","lang":"en","query":"4K montr IPS for graphic design","type":"product_lookup","note":"typo: montr → monitor — p006","expected_product_ids":["p006"],"expected_policy":null},
+  {"id":"en-022","lang":"en","query":"Can I pay cash on delivery COD?","type":"policy","note":"COD / payment policy","expected_product_ids":[],"expected_policy":"payment"},
+  {"id":"en-023","lang":"en","query":"ergonomic wrist rest pad for keyboard and mouse","type":"product_lookup","note":"wrist ergonomics query — p016","expected_product_ids":["p016"],"expected_policy":null},
+  {"id":"en-024","lang":"en","query":"cable organiser box to hide wires on my desk","type":"product_lookup","note":"cable management query — p013","expected_product_ids":["p013"],"expected_policy":null},
+  {"id":"en-025","lang":"en","query":"HM-KB-003","type":"product_lookup","note":"SKU lookup for mechanical keyboard — p003","expected_product_ids":["p003"],"expected_policy":null},
+
+  {"id":"ur-016","lang":"ur","query":"podcast ke liye USB microphone chahiye","type":"product_lookup","note":"romanized Urdu podcast mic — p011","expected_product_ids":["p011"],"expected_policy":null},
+  {"id":"ur-017","lang":"ur","query":"کیا آپ کے پاس بلوٹوتھ اسپیکر ہے؟","type":"product_lookup","note":"Urdu script Bluetooth speaker — p014","expected_product_ids":["p014"],"expected_policy":null},
+  {"id":"ur-018","lang":"ur","query":"wrist rest chahiye keyboard mouse ke liye office mein","type":"product_lookup","note":"Urdu romanized wrist rest — p016","expected_product_ids":["p016"],"expected_policy":null},
+  {"id":"ur-019","lang":"ur","query":"wireless earbuds anc noise cancelling chahiye","type":"product_lookup","note":"Urdu romanized ANC earbuds — p010","expected_product_ids":["p010"],"expected_policy":null},
+  {"id":"ur-020","lang":"ur","query":"واپسی کیسے کریں اگر پروڈکٹ ٹھیک نہ ہو؟","type":"policy","note":"Urdu script return policy","expected_product_ids":[],"expected_policy":"returns"},
+
+  {"id":"ar-013","lang":"ar","query":"أريد شراء ماوس لاسلكي للكمبيوتر","type":"product_lookup","note":"Arabic wireless mouse — p004","expected_product_ids":["p004"],"expected_policy":null},
+  {"id":"ar-014","lang":"ar","query":"هل عندكم سماعات أذن لاسلكية صغيرة؟","type":"product_lookup","note":"Arabic TWS earbuds — p010","expected_product_ids":["p010"],"expected_policy":null},
+  {"id":"ar-015","lang":"ar","query":"أحتاج ميكروفون USB للبودكاست والتسجيل","type":"product_lookup","note":"Arabic USB microphone — p011","expected_product_ids":["p011"],"expected_policy":null},
+  {"id":"ar-016","lang":"ar","query":"ما هو الضمان على المنتجات الإلكترونية؟","type":"policy","note":"Arabic warranty policy","expected_product_ids":[],"expected_policy":"warranty"},
+  {"id":"ar-017","lang":"ar","query":"أريد مصباح مكتبي مع شاحن لاسلكي","type":"product_lookup","note":"Arabic desk lamp with wireless charger — p008","expected_product_ids":["p008"],"expected_policy":null},
+
+  {"id":"mixed-004","lang":"ur","query":"bluetooth speaker waterproof chahiye outdoor use ke liye","type":"product_lookup","note":"Urdu roman + English features — p014","expected_product_ids":["p014"],"expected_policy":null},
+  {"id":"mixed-005","lang":"ar","query":"USB hub مع HDMI 4K","type":"product_lookup","note":"Arabic + English tech spec — p002","expected_product_ids":["p002"],"expected_policy":null},
+  {"id":"mixed-006","lang":"ur","query":"Smart Plug chahiye Alexa ke sath kaam kare","type":"product_lookup","note":"smart home Urdu roman + English — p012","expected_product_ids":["p012"],"expected_policy":null},
+
+  {"id":"greeting-004","lang":"ar","query":"مرحبا","type":"greeting","note":"short Arabic greeting","expected_product_ids":[],"expected_policy":null},
+  {"id":"greeting-005","lang":"en","query":"Good morning!","type":"greeting","note":"English time-based greeting","expected_product_ids":[],"expected_policy":null},
+
+  {"id":"oob-003","lang":"en","query":"Do you sell Android smartphones?","type":"out_of_catalogue","note":"smartphones not in catalogue — OOB signal","expected_product_ids":[],"expected_policy":null},
+  {"id":"oob-004","lang":"en","query":"I am looking for a PS5 or Xbox gaming console","type":"out_of_catalogue","note":"ps5 + xbox both in OOB signals","expected_product_ids":[],"expected_policy":null},
+  {"id":"oob-005","lang":"en","query":"What is the weather forecast for tomorrow in Karachi?","type":"out_of_scope","note":"completely off-topic weather question","expected_product_ids":[],"expected_policy":null}
 ]
