@@ -38,8 +38,11 @@ _CONVO_PATTERNS = re.compile(
 _GREETING = re.compile(
     r"^\s*(السلام\s+عليكم|وعليكم\s+السلام|"
     r"hi|hello|hey|salam|salaam|السلام|مرحبا|اسلام|"
-    r"aoa|assalam|walaikum|good\s*(morning|evening|afternoon)|"
-    r"kaise hain|kya haal|theek hain?|aap kaise)\W*$",
+    r"aoa|assalam|walaikum|good\s*(morning|evening|afternoon|day|night)|"
+    r"how are (you|u)|how r u|hows it going|whats up|what'?s up|"
+    r"kaise hain|kya haal|theek hain?|aap kaise|"
+    r"kaisa hai|kya chal raha|namaste|namaskar|"
+    r"كيف حالك|كيف الحال|أهلاً|أهلا|مساء الخير|صباح الخير)\W*$",
     re.IGNORECASE,
 )
 
