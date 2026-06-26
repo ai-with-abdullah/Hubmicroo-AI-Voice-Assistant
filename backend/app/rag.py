@@ -11,7 +11,7 @@ from typing import Any
 
 from .config import get_settings
 from .embedder import embed_text
-from .retrieval import retrieve
+from .retrieval import retrieve, has_bm25_matches
 from .router import classify
 from .cache import get_cache
 from .llm import generate
@@ -33,16 +33,18 @@ _SYSTEM = (
 
 # ── Query rewrite prompt ───────────────────────────────────────────────────────
 _REWRITE_PROMPT = (
-    "Correct any spelling mistakes, translate non-English text to English if needed, "
-    "and condense the customer message into a short English search query "
-    "(max 8 words, keep product names/SKUs exact). "
-    "Output ONLY the search query, nothing else.\n\nMessage: {msg}"
+    "Fix all spelling errors and condense the following customer query to max 8 words. "
+    "IMPORTANT: keep ALL product-related words (headphones, keyboard, webcam, monitor, "
+    "mouse, hub, stand, lamp, speaker, earbuds, microphone, plug, etc.) even when "
+    "misspelled — identify and correct them. Translate non-English parts to English. "
+    "Output ONLY the corrected query, nothing else.\n\nMessage: {msg}"
 )
 
 # Known out-of-catalogue items — when detected, suppress product cards so the
 # LLM can tell the user we don't carry them without showing a false match.
+# Use iphones? (optional plural s) so "iPhones" also matches.
 _OOB_SIGNALS = re.compile(
-    r'\b(iphone|ipad|macbook|airpod|'
+    r'\b(iphones?|ipads?|macbooks?|airpods?|'
     r'samsung\s+(phone|galaxy)|android\s+phone|'
     r'gaming\s+laptop|windows\s+laptop|desktop\s+pc|'
     r'playstation|ps[45]|xbox|nintendo)\b',
@@ -53,15 +55,15 @@ _OOB_SIGNALS = re.compile(
 def _rewrite_query(message: str) -> str:
     """Spell-correct and condense query to a tight English search intent.
 
-    Skips the LLM for short (≤8 word) pure-ASCII queries — BGE-M3 handles minor
-    typos and keyword queries well enough without the extra Ollama round-trip.
-    Non-ASCII (Arabic / Urdu script) queries are always translated to English so
-    that BM25 (English-only corpus) can contribute a score.
+    Skips the LLM for short (≤8 word) pure-ASCII queries that have BM25 matches
+    (i.e. clean English keywords the corpus already understands).
+    Triggers the LLM when: query is long, contains non-ASCII, OR every word is
+    unknown to BM25 — the last condition catches heavy-typo queries like
+    "wrreless hedphons" where BM25 gives zero coverage.
     """
     words = message.split()
-    # Fast path: short ASCII query — no LLM needed
-    if len(words) <= 8 and message.isascii():
-        return message
+    if len(words) <= 8 and message.isascii() and has_bm25_matches(message):
+        return message  # clean short ASCII query — skip LLM round-trip
     try:
         raw = generate(_REWRITE_PROMPT.format(msg=message)).strip()
         if not raw:
@@ -158,8 +160,25 @@ def answer(message: str, language: str | None = None) -> dict[str, Any]:
             "cached": True,
         }
 
-    # ── Retrieval — reuse the vector already computed for the cache check ─────
+    # ── Retrieval — reuse the vector already computed for the cache check ────
     hits = retrieve(search_query, top_k=settings.RETRIEVAL_TOP_K, query_vec=query_vec)
+
+    # Dual retrieval: when the rewrite changed the query, also search with the
+    # ORIGINAL message so product keywords dropped by the LLM (e.g. "headphones"
+    # from "whats the warrenty on the bluethooth headphnes…") are still found via
+    # BGE-M3's typo-tolerant dense similarity.  Merge by keeping best score.
+    if search_query != message:
+        orig_hits = retrieve(message, top_k=settings.RETRIEVAL_TOP_K)
+        merged: dict[str, tuple[float, dict]] = {}
+        for h in hits + orig_hits:
+            doc_id = h["payload"].get("_doc_id", id(h))
+            if doc_id not in merged or h["score"] > merged[doc_id][0]:
+                merged[doc_id] = (h["score"], h["payload"])
+        hits = sorted(
+            [{"score": s, "payload": p} for s, p in merged.values()],
+            key=lambda x: x["score"],
+            reverse=True,
+        )[:settings.RETRIEVAL_TOP_K]
     if not hits:
         return _fallback_response(lang)
 

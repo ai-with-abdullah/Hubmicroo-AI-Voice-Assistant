@@ -55,6 +55,21 @@ def _get_bm25() -> tuple[Any, list[str]]:
     return _bm25_index, _bm25_doc_ids
 
 
+def has_bm25_matches(query: str) -> bool:
+    """Return True if the query has at least one non-zero BM25 score.
+
+    Used by rag.py to detect likely-typo queries (all tokens unknown to BM25)
+    without importing private internals.
+    """
+    bm25, doc_ids = _get_bm25()
+    if bm25 is None or not doc_ids:
+        return True  # corpus not ready — assume clean
+    tokens = _tokenize(query)
+    if not tokens:
+        return True
+    return float(bm25.get_scores(tokens).max()) > 0.0
+
+
 # ── Main retrieval function ───────────────────────────────────────────────────
 
 def retrieve(
