@@ -1,113 +1,361 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hubmicroo — Admin</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hubmicroo Admin Panel</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; background: #f1f5f9; margin: 0; color: #0f172a; }
-    header { background: linear-gradient(135deg,#6d28d9,#2563eb); color: #fff; padding: 22px 20px; }
-    .wrap { max-width: 720px; margin: 24px auto; padding: 0 16px; }
-    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-    h2 { margin-top: 0; font-size: 17px; }
-    label { display: block; font-size: 13px; margin: 10px 0 4px; color: #475569; }
-    input, textarea { width: 100%; box-sizing: border-box; padding: 9px 11px;
-      border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    button { margin-top: 14px; background: linear-gradient(135deg,#6d28d9,#2563eb);
-      color: #fff; border: none; padding: 11px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; }
-    .ghost { background: #e2e8f0; color: #0f172a; }
-    .stat { font-size: 28px; font-weight: 700; color: #2563eb; }
-    .msg { margin-top: 12px; font-size: 14px; }
-    .ok { color: #16a34a; } .err { color: #dc2626; }
-    .stats { display: flex; gap: 30px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+    .sidebar { width: 220px; background: #1e293b; color: #fff; height: 100vh; position: fixed; top: 0; left: 0; display: flex; flex-direction: column; padding: 0; z-index: 100; }
+    .sidebar-logo { padding: 20px 18px 16px; font-size: 16px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-logo span { font-size: 11px; font-weight: 400; opacity: 0.55; display: block; margin-top: 2px; }
+    .sidebar nav { flex: 1; padding: 12px 0; }
+    .nav-link { display: flex; align-items: center; gap: 10px; padding: 10px 18px; font-size: 14px; cursor: pointer; border-radius: 0; transition: background 0.15s; color: rgba(255,255,255,0.75); border: none; background: none; width: 100%; text-align: left; }
+    .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.08); color: #fff; }
+    .main { margin-left: 220px; min-height: 100vh; }
+    .topbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .topbar h1 { font-size: 18px; font-weight: 700; }
+    #logout-btn { background: none; border: 1px solid #e2e8f0; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #64748b; }
+    #logout-btn:hover { background: #f1f5f9; }
+    .content { padding: 24px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* Login overlay */
+    #login-overlay { position: fixed; inset: 0; background: #f8fafc; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .login-card { background: #fff; border-radius: 16px; padding: 36px; box-shadow: 0 8px 40px rgba(0,0,0,0.1); width: 340px; }
+    .login-card h2 { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+    .login-card p { font-size: 13px; color: #64748b; margin-bottom: 24px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: #64748b; display: block; margin-bottom: 5px; }
+    input[type=text], input[type=password], input[type=number], textarea, select {
+      width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: 14px; color: #1e293b; background: #f8fafc; outline: none; font-family: inherit;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #2563eb; background: #fff; }
+    .btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.15s; }
+    .btn-primary { background: #2563eb; color: #fff; width: 100%; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #f1f5f9; color: #1e293b; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    #login-error { color: #ef4444; font-size: 13px; margin-top: 8px; display: none; }
+
+    /* Stats cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #fff; border-radius: 12px; padding: 18px; border: 1px solid #e2e8f0; }
+    .stat-card .label { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 6px; }
+    .stat-card .value { font-size: 28px; font-weight: 800; color: #2563eb; }
+    .stat-card .sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .badge-yellow { background: #fef9c3; color: #854d0e; }
+
+    /* Table */
+    .table-wrap { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px 14px; font-size: 11px; color: #64748b; font-weight: 700; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* Product form */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-full { grid-column: 1 / -1; }
+    .panel { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; margin-bottom: 20px; }
+    .panel h3 { font-size: 15px; font-weight: 700; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; }
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px; z-index: 9999; transform: translateY(60px); transition: transform 0.25s; pointer-events: none; }
+    .toast.show { transform: translateY(0); }
+    .toast.error { background: #ef4444; }
   </style>
 </head>
 <body>
-  <header><b>Hubmicroo Admin</b> — products & AI index</header>
-  <div class="wrap">
 
-    <div class="card">
-      <h2>Status</h2>
-      <div class="stats">
-        <div><div class="stat" id="sChunks">–</div><div>chunks indexed</div></div>
-        <div><div class="stat" id="sProducts">–</div><div>products</div></div>
-        <div><div class="stat" id="sLLM">–</div><div>LLM ready</div></div>
-      </div>
-      <button class="ghost" onclick="refresh()">Refresh</button>
-      <button onclick="reindex()">Re-index everything</button>
-      <div class="msg" id="reMsg"></div>
+<!-- Login Overlay -->
+<div id="login-overlay">
+  <div class="login-card">
+    <h2>🛍️ Admin Panel</h2>
+    <p>Hubmicroo Assistant Management</p>
+    <div class="form-group">
+      <label>USERNAME</label>
+      <input type="text" id="login-user" value="admin" autocomplete="username">
     </div>
-
-    <div class="card">
-      <h2>Add product (auto-indexed)</h2>
-      <p style="font-size:13px;color:#64748b">Adding a product indexes just that item — no full rebuild, no training.</p>
-      <div class="row">
-        <div><label>ID</label><input id="id" placeholder="P010"/></div>
-        <div><label>Name (English)</label><input id="name" placeholder="Wireless Earbuds"/></div>
-      </div>
-      <div class="row">
-        <div><label>Name (Urdu)</label><input id="name_ur" dir="rtl"/></div>
-        <div><label>Name (Arabic)</label><input id="name_ar" dir="rtl"/></div>
-      </div>
-      <div class="row">
-        <div><label>Price</label><input id="price" type="number" placeholder="3500"/></div>
-        <div><label>Currency</label><input id="currency" value="PKR"/></div>
-      </div>
-      <div class="row">
-        <div><label>Category</label><input id="category" placeholder="Audio"/></div>
-        <div><label>Brand</label><input id="brand" placeholder="SoundMax"/></div>
-      </div>
-      <label>Image URL</label><input id="image" placeholder="https://..."/>
-      <label>Product URL</label><input id="url" placeholder="https://www.hubmicroo.com/product/P010"/>
-      <label>Features (comma separated)</label><input id="features" placeholder="wireless, waterproof, 8h battery"/>
-      <label>Description</label><textarea id="description" rows="2"></textarea>
-      <label><input type="checkbox" id="in_stock" checked style="width:auto"/> In stock</label>
-      <button onclick="addProduct()">Add & index product</button>
-      <div class="msg" id="addMsg"></div>
+    <div class="form-group">
+      <label>PASSWORD</label>
+      <input type="password" id="login-pass" autocomplete="current-password">
     </div>
+    <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+    <div id="login-error">Invalid credentials</div>
   </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-logo">🛍️ Hubmicroo <span>Admin Panel</span></div>
+  <nav>
+    <button class="nav-link active" onclick="showSection('dashboard')">📊 Dashboard</button>
+    <button class="nav-link" onclick="showSection('products')">📦 Products</button>
+    <button class="nav-link" onclick="showSection('pages')">📄 Pages / FAQ</button>
+    <button class="nav-link" onclick="showSection('queries')">🔍 Recent Queries</button>
+  </nav>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <h1 id="section-title">Dashboard</h1>
+    <button id="logout-btn" onclick="doLogout()">Log out</button>
+  </div>
+  <div class="content">
+
+    <!-- Dashboard -->
+    <div id="section-dashboard" class="section active">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="label">INDEXED DOCS</div><div class="value" id="stat-docs">—</div></div>
+        <div class="stat-card"><div class="label">CACHE SIZE</div><div class="value" id="stat-cache">—</div></div>
+        <div class="stat-card"><div class="label">OLLAMA</div><div class="value" id="stat-ollama" style="font-size:16px;padding-top:6px">—</div></div>
+        <div class="stat-card"><div class="label">QDRANT</div><div class="value" id="stat-qdrant" style="font-size:16px;padding-top:6px">—</div></div>
+      </div>
+      <div class="panel">
+        <h3>Actions</h3>
+        <button class="btn btn-secondary" onclick="doReindex()">🔄 Full Reindex (admin)</button>
+        &nbsp;
+        <button class="btn btn-secondary" onclick="loadStats()">↻ Refresh stats</button>
+      </div>
+    </div>
+
+    <!-- Products -->
+    <div id="section-products" class="section">
+      <div class="panel">
+        <h3 id="product-form-title">Add Product</h3>
+        <div class="form-grid">
+          <div class="form-group"><label>ID (unique slug)</label><input type="text" id="p-id"></div>
+          <div class="form-group"><label>SKU</label><input type="text" id="p-sku"></div>
+          <div class="form-group form-full"><label>Name</label><input type="text" id="p-name"></div>
+          <div class="form-group form-full"><label>Description</label><textarea id="p-desc" rows="3"></textarea></div>
+          <div class="form-group"><label>Price (PKR)</label><input type="number" id="p-price" value="0"></div>
+          <div class="form-group"><label>Currency</label><select id="p-currency"><option>PKR</option><option>USD</option><option>AED</option></select></div>
+          <div class="form-group"><label>Category</label><input type="text" id="p-category"></div>
+          <div class="form-group"><label>In Stock</label><select id="p-stock"><option value="true">Yes</option><option value="false">No</option></select></div>
+          <div class="form-group form-full"><label>Image URL</label><input type="text" id="p-img"></div>
+          <div class="form-group form-full"><label>Buy URL</label><input type="text" id="p-url"></div>
+          <div class="form-group form-full"><label>Tags (comma-separated)</label><input type="text" id="p-tags"></div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="saveProduct()">💾 Save &amp; Index</button>
+          <button class="btn btn-secondary" onclick="clearProductForm()">Clear</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th></th></tr></thead>
+          <tbody id="products-table-body"><tr><td colspan="6" style="color:#94a3b8;text-align:center;padding:20px">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pages -->
+    <div id="section-pages" class="section">
+      <div class="panel">
+        <h3>Add / Edit Page</h3>
+        <div class="form-group"><label>ID (unique slug, e.g. "returns")</label><input type="text" id="pg-id"></div>
+        <div class="form-group"><label>Title</label><input type="text" id="pg-title"></div>
+        <div class="form-group"><label>Content</label><textarea id="pg-content" rows="8"></textarea></div>
+        <div style="margin-top:14px">
+          <button class="btn btn-primary" onclick="savePage()">💾 Save &amp; Index</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queries -->
+    <div id="section-queries" class="section">
+      <div class="panel" style="margin-bottom:16px">
+        <h3>Recent Queries (anonymised)</h3>
+        <button class="btn btn-secondary btn-sm" onclick="loadQueries()">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Lang</th><th>Type</th><th>Cached</th><th>Chars</th></tr></thead>
+          <tbody id="queries-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-function refresh() {
-  fetch("/api/health").then(r=>r.json()).then(h=>{
-    document.getElementById("sChunks").textContent = h.chunks_indexed ?? "–";
-    document.getElementById("sLLM").textContent = h.llm_ready ? "✓" : "✗";
+  let token = sessionStorage.getItem("hm_admin_token") || "";
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  async function doLogin() {
+    const user = document.getElementById("login-user").value;
+    const pass = document.getElementById("login-pass").value;
+    const fd = new FormData();
+    fd.append("username", user); fd.append("password", pass);
+    try {
+      const r = await fetch("/admin/login", { method: "POST", body: fd });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      token = d.access_token;
+      sessionStorage.setItem("hm_admin_token", token);
+      document.getElementById("login-overlay").style.display = "none";
+      loadStats();
+      loadProducts();
+    } catch {
+      document.getElementById("login-error").style.display = "block";
+    }
+  }
+
+  function doLogout() {
+    token = ""; sessionStorage.removeItem("hm_admin_token");
+    location.reload();
+  }
+
+  // Auto-hide login if token exists
+  if (token) {
+    document.getElementById("login-overlay").style.display = "none";
+    loadStats(); loadProducts();
+  }
+
+  document.getElementById("login-pass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+  // ── Navigation ───────────────────────────────────────────────────────────────
+  const sectionTitles = { dashboard: "Dashboard", products: "Products", pages: "Pages / FAQ", queries: "Recent Queries" };
+  function showSection(name) {
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.querySelectorAll(".nav-link").forEach(n => n.classList.remove("active"));
+    document.getElementById("section-" + name).classList.add("active");
+    document.querySelectorAll(".nav-link").forEach(n => { if (n.textContent.toLowerCase().includes(name.replace("dashboard","dashb"))) n.classList.add("active"); });
+    document.getElementById("section-title").textContent = sectionTitles[name];
+    if (name === "queries") loadQueries();
+    if (name === "products") loadProducts();
+  }
+  // Fix nav click targeting
+  document.querySelectorAll(".nav-link").forEach((btn, i) => {
+    const keys = ["dashboard","products","pages","queries"];
+    btn.onclick = () => showSection(keys[i]);
   });
-  fetch("/api/stats").then(r=>r.json()).then(s=>{
-    document.getElementById("sProducts").textContent = s.products ?? "–";
-  });
-}
-function reindex() {
-  const m = document.getElementById("reMsg");
-  m.textContent = "Re-indexing..."; m.className = "msg";
-  fetch("/api/reindex", {method:"POST"}).then(r=>r.json()).then(d=>{
-    m.textContent = d.detail ? ("Error: "+d.detail)
-      : ("Done. " + d.products + " products, " + d.chunks + " chunks.");
-    m.className = "msg " + (d.detail ? "err" : "ok");
-    refresh();
-  }).catch(()=>{ m.textContent="Failed"; m.className="msg err"; });
-}
-function addProduct() {
-  const g = id => document.getElementById(id).value.trim();
-  const body = {
-    id:g("id"), name:g("name"), name_ur:g("name_ur"), name_ar:g("name_ar"),
-    price:parseFloat(g("price")||"0"), currency:g("currency")||"PKR",
-    category:g("category"), brand:g("brand"), image:g("image"), url:g("url"),
-    description:g("description"),
-    features:g("features")?g("features").split(",").map(s=>s.trim()):[],
-    in_stock:document.getElementById("in_stock").checked
-  };
-  const m = document.getElementById("addMsg");
-  m.textContent="Adding..."; m.className="msg";
-  fetch("/api/products",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(body)}).then(r=>r.json()).then(d=>{
-    m.textContent = d.detail ? ("Error: "+d.detail) : ("Added "+d.added+" and indexed.");
-    m.className = "msg " + (d.detail ? "err":"ok");
-    refresh();
-  }).catch(()=>{ m.textContent="Failed"; m.className="msg err"; });
-}
-refresh();
+
+  // ── Stats ───────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const [s, h] = await Promise.all([
+        authFetch("/api/stats"), authFetch("/api/health")
+      ]);
+      const stats = await s.json(); const health = await h.json();
+      document.getElementById("stat-docs").textContent = stats.collection?.points_count ?? "—";
+      document.getElementById("stat-cache").textContent = stats.cache?.size ?? "—";
+      document.getElementById("stat-ollama").innerHTML = badge(health.ollama, "Ollama");
+      document.getElementById("stat-qdrant").innerHTML = badge(health.qdrant, "Qdrant");
+    } catch (e) { console.error(e); }
+  }
+
+  function badge(ok, label) {
+    return ok
+      ? `<span class="badge badge-green">● ${label} OK</span>`
+      : `<span class="badge badge-red">✕ ${label} Down</span>`;
+  }
+
+  // ── Reindex ─────────────────────────────────────────────────────────────────
+  async function doReindex() {
+    if (!confirm("Full reindex from data files. This may take a moment. Continue?")) return;
+    try {
+      const r = await authFetch("/admin/reindex", "POST");
+      const d = await r.json();
+      showToast(`Reindex done: ${d.indexed} items`);
+      loadStats();
+    } catch { showToast("Reindex failed", true); }
+  }
+
+  // ── Products ────────────────────────────────────────────────────────────────
+  let productsList = [];
+
+  async function loadProducts() {
+    // Load from the data file via our reindex endpoint isn't ideal;
+    // we call /api/stats for count and show a placeholder message.
+    document.getElementById("products-table-body").innerHTML =
+      `<tr><td colspan="6" style="color:#94a3b8;text-align:center;padding:20px">Use the form above to add/edit products. Products appear after indexing.</td></tr>`;
+  }
+
+  async function saveProduct() {
+    const product = {
+      id: v("p-id"), name: v("p-name"), description: v("p-desc"),
+      price: parseFloat(v("p-price")) || 0,
+      currency: v("p-currency"), in_stock: v("p-stock") === "true",
+      image_url: v("p-img"), buy_url: v("p-url"),
+      category: v("p-category"), sku: v("p-sku"),
+      tags: v("p-tags").split(",").map(t => t.trim()).filter(Boolean),
+    };
+    if (!product.id || !product.name) { showToast("ID and Name are required", true); return; }
+    try {
+      const r = await authFetch("/admin/products", "POST", product);
+      if (!r.ok) throw new Error(await r.text());
+      showToast(`Product "${product.name}" saved and indexed!`);
+      clearProductForm();
+      loadStats();
+    } catch (e) { showToast("Save failed: " + e.message, true); }
+  }
+
+  function clearProductForm() {
+    ["p-id","p-name","p-desc","p-price","p-img","p-url","p-category","p-sku","p-tags"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = el.type === "number" ? "0" : "";
+    });
+  }
+
+  // ── Pages ────────────────────────────────────────────────────────────────────
+  async function savePage() {
+    const page = { id: v("pg-id"), title: v("pg-title"), content: v("pg-content") };
+    if (!page.id || !page.title) { showToast("ID and Title required", true); return; }
+    try {
+      const r = await authFetch("/admin/pages", "POST", page);
+      if (!r.ok) throw new Error();
+      showToast(`Page "${page.title}" saved and indexed!`);
+    } catch { showToast("Save failed", true); }
+  }
+
+  // ── Queries ──────────────────────────────────────────────────────────────────
+  async function loadQueries() {
+    try {
+      const r = await authFetch("/admin/queries");
+      const rows = await r.json();
+      const tbody = document.getElementById("queries-table-body");
+      if (!rows.length) { tbody.innerHTML = `<tr><td colspan="5" style="color:#94a3b8;text-align:center;padding:20px">No queries yet</td></tr>`; return; }
+      tbody.innerHTML = rows.map(q => `
+        <tr>
+          <td>${new Date(q.ts * 1000).toLocaleTimeString()}</td>
+          <td><span class="badge badge-${q.lang==="en"?"green":q.lang==="ur"?"yellow":"red"}">${q.lang.toUpperCase()}</span></td>
+          <td>${q.type}</td>
+          <td>${q.cached ? "✅" : "—"}</td>
+          <td>${q.chars} chars</td>
+        </tr>`).join("");
+    } catch { showToast("Failed to load queries", true); }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function v(id) { return (document.getElementById(id)?.value || "").trim(); }
+
+  function authFetch(url, method = "GET", body = null) {
+    const opts = { method, headers: { Authorization: "Bearer " + token } };
+    if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    return fetch(url, opts);
+  }
+
+  let toastTimer;
+  function showToast(msg, isError = false) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.className = "toast show" + (isError ? " error" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 3000);
+  }
 </script>
 </body>
 </html>

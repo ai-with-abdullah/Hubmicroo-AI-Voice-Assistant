@@ -17,3 +17,16 @@ backend/data/vector/
 
 # Notebook checkpoints
 .ipynb_checkpoints/
+
+# Runtime-generated data
+backend/data/bm25_corpus.json
+
+# Model weights / caches
+*.onnx
+*.bin
+*.safetensors
+piper_voices/
+.cache/
+
+# Eval output
+eval/results*.json

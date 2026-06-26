@@ -1,247 +1,300 @@
-/* Hubmicroo Voice Assistant widget — embeddable on any page.
- *
- * Voice in/out uses the browser's built-in Web Speech API (no install, no API
- * keys). It posts the transcript to the self-hosted backend (/api/chat), which
- * returns a grounded answer + product cards. Speech-to-text and text-to-speech
- * can later be swapped for private self-hosted Whisper/MMS without touching the
- * backend contract.
+/**
+ * Hubmicroo Assistant Widget
+ * Self-contained embeddable widget — no browser Web Speech API.
+ * Audio recording uses MediaRecorder → sends to server Whisper STT.
  */
 (function () {
   "use strict";
 
-  // Point this at your backend. Defaults to same origin.
-  var API_BASE = (window.HUBMICROO_API_BASE || "") + "/api";
+  const API_BASE = window.HM_API_BASE || "";
 
-  var LANGS = {
-    en: { code: "en-US", name: "English", rtl: false, dir: "ltr" },
-    ur: { code: "ur-PK", name: "اردو", rtl: true, dir: "rtl" },
-    ar: { code: "ar-SA", name: "العربية", rtl: true, dir: "rtl" },
-  };
-  var GREETING = {
-    en: "Hello! Ask me about our products, prices, delivery or anything on Hubmicroo.",
-    ur: "السلام علیکم! ہماری پروڈکٹس، قیمتوں یا ڈیلیوری کے بارے میں پوچھیں۔",
-    ar: "مرحبًا! اسألني عن منتجاتنا أو الأسعار أو التوصيل في هب مايكرو.",
-  };
+  // ── Build DOM ──────────────────────────────────────────────────────────────
+  function buildWidget() {
+    // Launcher
+    const launcher = el("button", { id: "hm-launcher", "aria-label": "Open assistant" });
+    launcher.innerHTML = iconChat();
 
-  var state = { lang: "en", auto: true, listening: false, muted: false,
-                lastAnswer: "" };
+    // Modal
+    const modal = el("div", { id: "hm-modal", role: "dialog", "aria-label": "Shopping assistant" });
+    modal.innerHTML = `
+      <div id="hm-header">
+        <div id="hm-header-avatar">🛍️</div>
+        <div>
+          <div id="hm-header-title">Hubmicroo Assistant</div>
+          <div id="hm-header-sub">Ask me anything about our products</div>
+        </div>
+        <button id="hm-close" aria-label="Close">${iconX()}</button>
+      </div>
+      <div id="hm-messages" aria-live="polite"></div>
+      <div id="hm-status"></div>
+      <div id="hm-input-area">
+        <textarea id="hm-text-input" rows="1" placeholder="Type a message…" maxlength="500"></textarea>
+        <button class="hm-icon-btn" id="hm-mic-btn" aria-label="Record voice">${iconMic()}</button>
+        <button class="hm-icon-btn" id="hm-send-btn" aria-label="Send">${iconSend()}</button>
+      </div>`;
 
-  // ---- Speech recognition (speech -> text) -----------------------------
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var recog = null, micSupported = !!SR;
+    document.body.appendChild(launcher);
+    document.body.appendChild(modal);
 
-  function buildRecognizer() {
-    if (!SR) return null;
-    var r = new SR();
-    r.lang = LANGS[state.lang].code;
-    r.interimResults = true;
-    r.continuous = false;
-    r.onresult = function (e) {
-      var txt = "";
-      for (var i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
-      setTranscript(txt);
-      if (e.results[e.results.length - 1].isFinal) {
-        stopListening();
-        sendMessage(txt);
-      }
-    };
-    r.onerror = function (e) {
-      stopListening();
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        showTextFallback("Microphone blocked — type your question instead.");
-      }
-    };
-    r.onend = function () { if (state.listening) stopListening(); };
-    return r;
-  }
-
-  // ---- Speech synthesis (text -> speech) -------------------------------
-  function speak(text, lang) {
-    if (state.muted || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
-    u.lang = LANGS[lang].code;
-    var v = (window.speechSynthesis.getVoices() || []).find(function (x) {
-      return x.lang && x.lang.toLowerCase().indexOf(lang) === 0;
+    // Wire events
+    launcher.addEventListener("click", toggleModal);
+    modal.querySelector("#hm-close").addEventListener("click", toggleModal);
+    modal.querySelector("#hm-send-btn").addEventListener("click", handleSend);
+    modal.querySelector("#hm-text-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
     });
-    if (v) u.voice = v;
-    window.speechSynthesis.speak(u);
-  }
+    modal.querySelector("#hm-mic-btn").addEventListener("click", handleMic);
 
-  // ---- Networking ------------------------------------------------------
-  function sendMessage(message) {
-    if (!message || !message.trim()) return;
-    addBubble(message, "user");
-    setTranscript("");          // clear the live voice transcript once sent
-    setProcessing(true);
-    fetch(API_BASE + "/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: message, language: state.auto ? null : state.lang }),
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        setProcessing(false);
-        if (data.language && LANGS[data.language]) applyLang(data.language, false);
-        addBubble(data.answer, "bot");
-        renderProducts(data.products || []);
-        state.lastAnswer = data.answer;
-        speak(data.answer, data.language || state.lang);
-      })
-      .catch(function () {
-        setProcessing(false);
-        addBubble("Connection problem. Please try again.", "bot");
-      });
-  }
-
-  // ---- UI --------------------------------------------------------------
-  var el = {};
-  function h(tag, cls, html) {
-    var n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (html != null) n.innerHTML = html;
-    return n;
-  }
-
-  function build() {
-    el.fab = h("button", "hm-fab", "🎤");
-    el.fab.title = "Voice Assistant";
-    el.fab.onclick = openModal;
-
-    el.modal = h("div", "hm-modal hm-hidden");
-    el.modal.innerHTML =
-      '<div class="hm-card">' +
-      '  <div class="hm-head">' +
-      '    <span class="hm-title">Hubmicroo Assistant</span>' +
-      '    <select class="hm-lang"></select>' +
-      '    <button class="hm-mute" title="Mute">🔊</button>' +
-      '    <button class="hm-close" title="Close">✕</button>' +
-      '  </div>' +
-      '  <div class="hm-body"></div>' +
-      '  <div class="hm-products"></div>' +
-      '  <div class="hm-micwrap">' +
-      '    <div class="hm-wave"><i></i><i></i><i></i><i></i><i></i></div>' +
-      '    <div class="hm-transcript"></div>' +
-      '  </div>' +
-      '  <div class="hm-input">' +
-      '    <input class="hm-text" placeholder="Type or tap the mic..."/>' +
-      '    <button class="hm-mic" title="Speak">🎤</button>' +
-      '    <button class="hm-send" title="Send">➤</button>' +
-      '  </div>' +
-      "</div>";
-
-    document.body.appendChild(el.fab);
-    document.body.appendChild(el.modal);
-
-    el.card = el.modal.querySelector(".hm-card");
-    el.body = el.modal.querySelector(".hm-body");
-    el.products = el.modal.querySelector(".hm-products");
-    el.wave = el.modal.querySelector(".hm-wave");
-    el.transcript = el.modal.querySelector(".hm-transcript");
-    el.textInput = el.modal.querySelector(".hm-text");
-    el.langSel = el.modal.querySelector(".hm-lang");
-
-    // Language selector: Auto + the 3 languages.
-    var optAuto = h("option", null, "Auto");
-    optAuto.value = "auto";
-    el.langSel.appendChild(optAuto);
-    Object.keys(LANGS).forEach(function (k) {
-      var o = h("option", null, LANGS[k].name);
-      o.value = k;
-      el.langSel.appendChild(o);
+    // Auto-resize textarea
+    const ta = modal.querySelector("#hm-text-input");
+    ta.addEventListener("input", () => {
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 100) + "px";
     });
-    el.langSel.onchange = function () {
-      if (this.value === "auto") { state.auto = true; }
-      else { state.auto = false; applyLang(this.value, true); }
-    };
-
-    el.modal.querySelector(".hm-close").onclick = closeModal;
-    el.modal.querySelector(".hm-mic").onclick = toggleListening;
-    el.modal.querySelector(".hm-send").onclick = function () {
-      var t = el.textInput.value.trim();
-      if (t) { el.textInput.value = ""; sendMessage(t); }
-    };
-    el.textInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { var t = this.value.trim(); if (t) { this.value = ""; sendMessage(t); } }
-    });
-    el.modal.querySelector(".hm-mute").onclick = function () {
-      state.muted = !state.muted;
-      this.textContent = state.muted ? "🔇" : "🔊";
-      if (state.muted && window.speechSynthesis) window.speechSynthesis.cancel();
-    };
-    if (!micSupported) el.modal.querySelector(".hm-mic").style.display = "none";
   }
 
-  function openModal() {
-    el.modal.classList.remove("hm-hidden");
-    if (!el.body.children.length) {
-      addBubble(GREETING[state.lang], "bot");
-      speak(GREETING[state.lang], state.lang);
+  // ── State ──────────────────────────────────────────────────────────────────
+  let isOpen = false;
+  let isRecording = false;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let micDenied = false;
+  let currentLang = "en";
+
+  function toggleModal() {
+    isOpen = !isOpen;
+    document.getElementById("hm-modal").classList.toggle("hm-open", isOpen);
+    if (isOpen && document.getElementById("hm-messages").children.length === 0) {
+      sendGreeting();
     }
-    el.textInput.focus();
-  }
-  function closeModal() {
-    el.modal.classList.add("hm-hidden");
-    stopListening();
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (isOpen) document.getElementById("hm-text-input").focus();
   }
 
-  function applyLang(lang, announce) {
-    state.lang = lang;
-    el.card.dir = LANGS[lang].dir;
-    el.card.classList.toggle("hm-rtl", LANGS[lang].rtl);
-    if (recog) recog.lang = LANGS[lang].code;
-    if (announce) { addBubble(GREETING[lang], "bot"); speak(GREETING[lang], lang); }
+  // ── Greeting ───────────────────────────────────────────────────────────────
+  function sendGreeting() {
+    const greetings = {
+      en: "Hi! I'm the Hubmicroo shopping assistant. How can I help you today?",
+      ur: "Salam! Main Hubmicroo ka shopping assistant hoon. Aap ki kya madad kar sakta hoon?",
+      ar: "مرحباً! أنا مساعد تسوق هبمايكرو. كيف يمكنني مساعدتك؟",
+    };
+    appendBotMessage(greetings[currentLang] || greetings.en, [], currentLang);
   }
 
-  function toggleListening() { state.listening ? stopListening() : startListening(); }
-  function startListening() {
-    if (!micSupported) return;
-    recog = buildRecognizer();
-    try { recog.start(); } catch (e) { return; }
-    state.listening = true;
-    el.wave.classList.add("hm-active");
-    setTranscript("");
-  }
-  function stopListening() {
-    state.listening = false;
-    el.wave.classList.remove("hm-active");
-    if (recog) { try { recog.stop(); } catch (e) {} }
-  }
+  // ── Chat ───────────────────────────────────────────────────────────────────
+  async function handleSend() {
+    const ta = document.getElementById("hm-text-input");
+    const msg = ta.value.trim();
+    if (!msg) return;
+    ta.value = "";
+    ta.style.height = "auto";
 
-  function setTranscript(t) { el.transcript.textContent = t; }
-  function setProcessing(on) {
-    if (on) addBubble('<span class="hm-typing">●●●</span>', "bot", true);
-    else { var t = el.body.querySelector(".hm-temp"); if (t) t.remove(); }
-  }
+    appendUserMessage(msg);
+    const typing = appendTyping();
+    setStatus("");
 
-  function addBubble(text, who, temp) {
-    var b = h("div", "hm-bubble hm-" + who + (temp ? " hm-temp" : ""), text);
-    el.body.appendChild(b);
-    el.body.scrollTop = el.body.scrollHeight;
-  }
-
-  function renderProducts(products) {
-    el.products.innerHTML = "";
-    products.forEach(function (p) {
-      var card = h("a", "hm-pcard");
-      card.href = p.url || "#";
-      card.target = "_blank";
-      var stock = p.in_stock
-        ? '<span class="hm-in">In stock</span>'
-        : '<span class="hm-out">Out of stock</span>';
-      card.innerHTML =
-        (p.image ? '<img src="' + p.image + '" alt=""/>' : "") +
-        '<div class="hm-pname">' + (p.name || "") + "</div>" +
-        '<div class="hm-pprice">' + (p.price != null ? p.price + " " + (p.currency || "") : "") + "</div>" +
-        stock;
-      el.products.appendChild(card);
-    });
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: msg }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      currentLang = data.lang || "en";
+      removeTyping(typing);
+      appendBotMessage(data.answer, data.products || [], data.lang);
+    } catch (err) {
+      removeTyping(typing);
+      appendBotMessage("Sorry, something went wrong. Please try again.", [], "en");
+    }
   }
 
-  function showTextFallback(msg) { addBubble(msg, "bot"); el.textInput.focus(); }
+  // ── Voice ──────────────────────────────────────────────────────────────────
+  async function handleMic() {
+    if (micDenied) return;
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+    await startRecording();
+  }
 
-  if (document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", build);
-  else build();
+  async function startRecording() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      micDenied = true;
+      const btn = document.getElementById("hm-mic-btn");
+      btn.classList.add("mic-denied");
+      btn.title = "Microphone access denied — use text input";
+      setStatus("Mic access denied. Please type your question.");
+      return;
+    }
+
+    audioChunks = [];
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      processAudio(mimeType);
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById("hm-mic-btn").classList.add("recording");
+    setStatus("🎙 Recording… tap to stop");
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+    isRecording = false;
+    document.getElementById("hm-mic-btn").classList.remove("recording");
+    setStatus("Processing…");
+  }
+
+  async function processAudio(mimeType) {
+    const blob = new Blob(audioChunks, { type: mimeType });
+    if (blob.size < 1000) { setStatus(""); return; }
+
+    const typing = appendTyping();
+    const formData = new FormData();
+    formData.append("audio", blob, "recording.webm");
+    formData.append("language", currentLang);
+    formData.append("tts", "true");
+
+    try {
+      const res = await fetch(`${API_BASE}/api/voice`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      currentLang = data.lang || "en";
+
+      if (data.transcript) appendUserMessage(`🎙 ${data.transcript}`);
+      removeTyping(typing);
+      appendBotMessage(data.answer, data.products || [], data.lang);
+
+      if (data.audio_b64) playBase64Audio(data.audio_b64);
+    } catch (err) {
+      removeTyping(typing);
+      appendBotMessage("Voice processing failed. Please type your question.", [], "en");
+    }
+    setStatus("");
+  }
+
+  function playBase64Audio(b64) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const blob = new Blob([arr], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.play().catch(() => {});
+    audio.onended = () => URL.revokeObjectURL(url);
+  }
+
+  // ── DOM helpers ────────────────────────────────────────────────────────────
+  function appendUserMessage(text) {
+    const msgs = document.getElementById("hm-messages");
+    const div = el("div", { class: "hm-msg hm-user" });
+    div.innerHTML = `<div class="hm-bubble">${escHtml(text)}</div>`;
+    msgs.appendChild(div);
+    scrollToBottom();
+  }
+
+  function appendBotMessage(text, products, lang) {
+    const msgs = document.getElementById("hm-messages");
+    const isRtl = lang === "ur" || lang === "ar";
+    const div = el("div", { class: `hm-msg hm-bot${isRtl ? " hm-rtl" : ""}` });
+
+    let html = `<div class="hm-bubble">${escHtml(text)}</div>`;
+
+    if (products && products.length > 0) {
+      html += `<div class="hm-products">`;
+      for (const p of products) {
+        const stock = p.in_stock
+          ? `<span class="hm-product-stock">In Stock</span>`
+          : `<span class="hm-product-stock out">Out of Stock</span>`;
+        const img = p.image_url
+          ? `<img class="hm-product-img" src="${escAttr(p.image_url)}" alt="${escAttr(p.name)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2252%22 height=%2252%22><rect fill=%22%23f1f5f9%22 width=%2252%22 height=%2252%22/><text x=%2226%22 y=%2232%22 text-anchor=%22middle%22 font-size=%2220%22>📦</text></svg>'">`
+          : `<div class="hm-product-img" style="display:flex;align-items:center;justify-content:center;font-size:22px">📦</div>`;
+        html += `
+          <div class="hm-product-card">
+            ${img}
+            <div class="hm-product-info">
+              <div class="hm-product-name" title="${escAttr(p.name)}">${escHtml(p.name)}</div>
+              <div>
+                <span class="hm-product-price">${escHtml(String(p.currency))} ${escHtml(String(p.price))}</span>
+                ${stock}
+              </div>
+            </div>
+            ${p.buy_url ? `<a class="hm-buy-btn" href="${escAttr(p.buy_url)}" target="_blank" rel="noopener">Buy</a>` : ""}
+          </div>`;
+      }
+      html += `</div>`;
+    }
+
+    div.innerHTML = html;
+    msgs.appendChild(div);
+    scrollToBottom();
+  }
+
+  function appendTyping() {
+    const msgs = document.getElementById("hm-messages");
+    const div = el("div", { class: "hm-msg hm-bot hm-typing", id: "hm-typing" });
+    div.innerHTML = `<div class="hm-bubble"><div class="hm-dot"></div><div class="hm-dot"></div><div class="hm-dot"></div></div>`;
+    msgs.appendChild(div);
+    scrollToBottom();
+    return div;
+  }
+
+  function removeTyping(el) {
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  }
+
+  function setStatus(msg) {
+    const s = document.getElementById("hm-status");
+    if (s) s.textContent = msg;
+  }
+
+  function scrollToBottom() {
+    const msgs = document.getElementById("hm-messages");
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function el(tag, attrs = {}) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    return e;
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function escAttr(s) { return escHtml(s); }
+
+  // ── Icons (inline SVG) ─────────────────────────────────────────────────────
+  function iconChat() {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+  }
+  function iconX() {
+    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+  }
+  function iconMic() {
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+  }
+  function iconSend() {
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", buildWidget);
+  } else {
+    buildWidget();
+  }
 })();

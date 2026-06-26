@@ -1,31 +1,33 @@
-# Running the assistant on Kaggle (free GPU)
+# Running on Kaggle (Testing Only)
 
-Your laptop has no GPU, so the AI is slow locally. Kaggle gives a **free GPU**
-where it runs in **seconds**. Use this to test it and to demo it to the client.
+Kaggle gives you a **free T4 GPU (16 GB)** — enough to run Qdrant, Ollama + qwen3:4b, BGE-M3, and Whisper simultaneously.
 
-## Steps
-1. Go to **https://www.kaggle.com/code** → **New Notebook**.
-2. **File → Import Notebook** → upload `kaggle/run_on_kaggle.ipynb` from this repo.
-   (Or **File → Import** from the GitHub URL.)
-3. In the right sidebar **Settings**:
-   - **Accelerator** → `GPU T4 x2`
-   - **Internet** → `On`  (required to download models)
-4. Click **Run All**.
-5. Wait for the models to download (first run only). The cell labelled **6** prints:
-   ```
-   OPEN THIS LINK IN YOUR BROWSER: https://something.trycloudflare.com
-   ```
-6. Open that link → tap the 🎤 mic and speak in **English / Urdu / Arabic**, or type.
+## Quick start
+
+1. Upload `run_on_kaggle.ipynb` to a new Kaggle notebook.
+2. Enable **GPU T4 x2** accelerator in Settings → Accelerator.
+3. Enable **Internet** access in Settings → Internet.
+4. Run all cells — the last cell starts the backend and prints the public `ngrok` URL.
+5. Open the URL + `/` to see the store widget, or `/admin` for the admin panel.
+
+## What the notebook does
+
+| Step | What happens |
+|------|--------------|
+| 1 | Install system deps (ffmpeg, curl) |
+| 2 | Install Python packages from requirements.txt |
+| 3 | Start Qdrant in background |
+| 4 | Install Ollama, pull `qwen3:4b` |
+| 5 | Download BGE-M3 embeddings |
+| 6 | Clone/copy the repo code |
+| 7 | Seed the vector index from `products.json` + `pages.json` |
+| 8 | Start FastAPI with uvicorn |
+| 9 | Expose via `pyngrok` (free tunnel) |
+| 10 | Print public URL and run the eval harness |
 
 ## Notes
-- The public link works **only while the notebook is running**. It's for testing
-  and demos — not the final hosting.
-- Want sharper answers? In the notebook, change `qwen2.5:3b` to `qwen2.5:7b`
-  (cells 2, 4, 5). The T4 GPU can handle it.
-- For the **real client website**, deploy the same project on the client's own
-  server and use a permanent domain — see `../INTEGRATION.md`.
 
-## Why Kaggle can't be the final home
-Kaggle sessions stop after a few hours and limit you to ~30 GPU hours/week. It's
-perfect for testing on a GPU, but the client needs an always-on server for
-production.
+- **This is for testing only.** Kaggle sessions expire after 12 hours.
+- The Kaggle free tier does not persist data between sessions.
+- For production, run `docker compose up` on a VPS with 8–16 GB RAM.
+- Piper TTS voice models are large — TTS is disabled by default on Kaggle (`TTS_ENABLED=false`).

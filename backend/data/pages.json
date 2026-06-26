@@ -1,27 +1,32 @@
 [
   {
-    "url": "https://www.hubmicroo.com/shipping",
-    "title": "Shipping & Delivery",
-    "text": "Hubmicroo delivers across Pakistan. Orders in Lahore, Karachi and Islamabad are delivered within 2 to 3 working days. Other cities take 3 to 5 working days. Delivery is free on orders above 5000 PKR; below that a flat 250 PKR delivery charge applies. Cash on delivery is available nationwide. You will receive an SMS with a tracking number once your order ships."
+    "id": "shipping",
+    "title": "Shipping Policy",
+    "content": "Hubmicroo ships across Pakistan. Standard delivery takes 3-5 business days. Express delivery (1-2 days) is available in Karachi, Lahore, and Islamabad for an additional fee of PKR 200. Free shipping on orders above PKR 3,000. Orders placed before 2PM are dispatched same day. Tracking numbers are sent via SMS and email after dispatch."
   },
   {
-    "url": "https://www.hubmicroo.com/returns",
-    "title": "Returns & Refunds",
-    "text": "Products can be returned within 7 days of delivery if they are unused and in original packaging. To start a return, contact Hubmicroo support with your order number. Refunds are processed within 5 to 7 working days after the returned item passes inspection. Items damaged by misuse are not eligible for return. Warranty claims are handled separately according to the brand warranty."
+    "id": "returns",
+    "title": "Returns & Refund Policy",
+    "content": "We accept returns within 7 days of delivery if the product is unused and in original packaging. Damaged or defective items are eligible for a free replacement or full refund within 14 days. To initiate a return, contact support at support@hubmicroo.com or WhatsApp 0300-1234567. Refunds are processed within 3-5 business days to the original payment method."
   },
   {
-    "url": "https://www.hubmicroo.com/payment",
+    "id": "warranty",
+    "title": "Warranty Policy",
+    "content": "All Hubmicroo products carry a minimum 6-month manufacturer warranty. Electronics and accessories are covered for 1 year. Warranty covers manufacturing defects only — physical damage, water damage (unless rated waterproof), and misuse are excluded. Register your product within 30 days of purchase at hubmicroo.com/warranty to activate the extended warranty."
+  },
+  {
+    "id": "payment",
     "title": "Payment Methods",
-    "text": "Hubmicroo accepts Cash on Delivery, bank transfer, JazzCash and Easypaisa. Card payments are accepted online through a secure gateway. Prices on the website are in Pakistani Rupees (PKR) and include applicable taxes."
+    "content": "We accept Cash on Delivery (COD) across Pakistan, JazzCash, EasyPaisa, bank transfer (HBL, MCB, UBL), and all major credit/debit cards via secure Stripe checkout. Installment plans (0% markup) are available on orders above PKR 10,000 through selected banks. All online transactions are SSL encrypted."
   },
   {
-    "url": "https://www.hubmicroo.com/about",
-    "title": "About Hubmicroo",
-    "text": "Hubmicroo is a Pakistani online store for electronics and accessories including audio devices, wearables, computer accessories and chargers. We focus on genuine products, fair prices and fast local delivery. Our support team is available 7 days a week."
-  },
-  {
-    "url": "https://www.hubmicroo.com/contact",
+    "id": "contact",
     "title": "Contact & Support",
-    "text": "You can reach Hubmicroo support by phone at 03137938402 or by email at Hubmicroo@gmail.com. Support is available from 9 AM to 9 PM, seven days a week. For order issues, please keep your order number ready."
+    "content": "Customer support is available Monday-Saturday 9AM-9PM. Email: support@hubmicroo.com | WhatsApp: 0300-1234567 | Phone: 021-34567890. For order tracking, use the tracking portal at hubmicroo.com/track. Average response time for email is under 4 hours during working hours."
+  },
+  {
+    "id": "faq-general",
+    "title": "General FAQ",
+    "content": "Q: Are all products genuine? A: Yes, all products sold by Hubmicroo are 100% authentic with valid warranties. Q: Do you have a physical store? A: We are online-only but have a pickup point in Karachi. Q: Can I cancel an order? A: Orders can be cancelled within 1 hour of placing them. After dispatch, the return policy applies. Q: Do you offer bulk discounts? A: Yes, contact sales@hubmicroo.com for bulk pricing on orders of 10+ units."
   }
 ]

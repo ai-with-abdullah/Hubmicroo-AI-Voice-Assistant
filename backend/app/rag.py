@@ -1,147 +1,174 @@
-"""RAG: answer any customer question grounded ONLY in Hubmicroo's website.
+"""Core RAG pipeline — query-rewrite → retrieve → route → answer.
 
-Flow per message (light — no indexing here):
-  detect language -> embed question -> retrieve top chunks from the vector store
-  (gathered across ALL pages/products) -> LLM writes one grounded answer in the
-  customer's language -> attach product cards.
-
-The system prompt forces the model to use only the retrieved context and to say
-"I don't know" instead of inventing answers — so it never makes things up.
+Returns a structured response with the answer text and matched product cards.
+Product cards appear only when products genuinely match the user's intent.
 """
-from . import config, llm, store
-from .indexer import VS
-from .services.langdetect import detect_language
+from __future__ import annotations
 
-_SYSTEM = """You are the shopping assistant for the Hubmicroo online store.
-STRICT RULES — follow exactly:
-- Use ONLY the information in WEBSITE INFO and MATCHING PRODUCTS below.
-- You may ONLY mention products that appear in MATCHING PRODUCTS, and you MUST use their EXACT names and EXACT prices. NEVER invent product names, brands, models, or prices. Do not use any product knowledge from outside this list.
-- If MATCHING PRODUCTS is empty, do NOT mention, list, or suggest any products. Just answer the question from WEBSITE INFO, or chat briefly. Never volunteer a product list the customer did not ask for.
-- If MATCHING PRODUCTS is empty and the answer is not in WEBSITE INFO, say you don't have that and suggest contacting Hubmicroo support.
-- Reply in {language} only.
-- Be short and friendly — this is read aloud. Mention at most {spoken} products.
-"""
+import logging
+from typing import Any
 
+from .config import get_settings
+from .embedder import embed_text
+from .retrieval import retrieve
+from .router import classify
+from .cache import get_cache
+from .llm import generate
+from .langdetect import detect_language
 
-def _products_block(products) -> str:
-    if not products:
-        return "(none)"
-    lines = []
-    for p in products[:config.SPOKEN_RESULTS]:
-        stock = "in stock" if p["in_stock"] else "out of stock"
-        lines.append(
-            f"- {p['name']}: {p['price']} {p['currency']}, {stock}."
-            f" {p.get('description', '')}".strip()
-        )
-    return "\n".join(lines)
+logger = logging.getLogger(__name__)
+settings = get_settings()
 
-
-def _context(chunks) -> str:
-    blocks = []
-    for i, c in enumerate(chunks, 1):
-        src = c["meta"].get("url") or c["meta"].get("type", "")
-        blocks.append(f"[{i}] {c['text']}  (source: {src})")
-    return "\n".join(blocks)
-
-
-# Greetings / small talk in EN/UR/AR (script + romanized). NOT product searches.
-_GREETINGS = (
-    # English
-    "hello", "hi ", "hey", "how are you", "good morning", "good evening",
-    "good afternoon", "thanks", "thank you", "whats up", "what's up",
-    "who are you", "good night",
-    # Romanized Urdu (Latin letters — what people often type)
-    "salam", "assalam", "asalam", "aoa", "kaise ho", "kaise hain", "kaise hai",
-    "kase ho", "kese ho", "kasy ho", "kya haal", "kya hal", "kia haal", "shukria",
-    "shukriya", "theek ho", "kaisa hai", "ap kaise", "aap kaise",
-    # Romanized Arabic
-    "kaif halak", "kaif halik", "shukran", "marhaba", "ahlan", "sabah",
-    # Urdu script
-    "السلام علیکم", "اسلام علیکم", "سلام", "آپ کیسے ہیں", "کیسے ہو", "کیسے ہیں",
-    "ہیلو", "شکریہ", "کیا حال",
-    # Arabic script
-    "السلام عليكم", "مرحبا", "اهلا", "أهلا", "كيف حالك", "كيف الحال", "شكرا",
-    "صباح الخير", "مساء الخير",
+# ── System prompt (grounding contract) ────────────────────────────────────────
+_SYSTEM = (
+    "You are the Hubmicroo shopping assistant. "
+    "Answer ONLY using the CONTEXT provided below. "
+    "Never invent product names, prices, or policies. "
+    "If the answer is not in the context, say you don't know and offer to connect "
+    "the user with support. "
+    "Be concise — 2-4 sentences maximum. "
+    "Reply in the same language as the user's question."
 )
-_GREETING_REPLY = {
-    "en": "Hello! 👋 How can I help you with Hubmicroo products today?",
-    "ur": "السلام علیکم! میں ہب مائیکرو کی پروڈکٹس میں آپ کی کیسے مدد کر سکتا ہوں؟",
-    "ar": "مرحبًا! كيف يمكنني مساعدتك في منتجات هب مايكرو اليوم؟",
-}
+
+# ── Query rewrite prompt ───────────────────────────────────────────────────────
+_REWRITE_PROMPT = (
+    "Condense the following customer message into a short search intent "
+    "(max 10 words, keep product names/SKUs exact). "
+    "Output ONLY the condensed query, nothing else.\n\nMessage: {msg}"
+)
 
 
-def _is_greeting(message: str) -> bool:
-    m = f" {message.strip().lower()} "
-    if len(message.strip()) > 40:        # long messages are real questions
-        return False
-    return any(g in m for g in _GREETINGS)
-
-
-def answer(message: str, language: str = None) -> dict:
-    """Return {answer, language, products, sources}."""
-    lang = language if language in config.LANG_NAMES else detect_language(message)
-
-    # 0) Greetings / small talk -> friendly reply, NO product search.
-    if _is_greeting(message):
-        return {"answer": _GREETING_REPLY[lang], "language": lang,
-                "products": [], "sources": []}
-
-    # 1) Retrieve relevant knowledge from across the whole site.
+def _rewrite_query(message: str) -> str:
+    """Shorten a long/rambling message to a tight search intent."""
+    if len(message.split()) <= 8:
+        return message  # already short — skip LLM call
     try:
-        qvec = llm.embed_one(message)
-        chunks = VS.search(qvec, k=config.TOP_K, floor=config.RETRIEVE_FLOOR)
-    except llm.LLMError as e:
-        return {"answer": str(e), "language": lang, "products": [], "sources": [],
-                "error": True}
+        return generate(_REWRITE_PROMPT.format(msg=message)).strip()
+    except Exception:
+        return message
 
-    # Website text (policies/FAQ/about) is kept separate from products, so the
-    # model only talks products when there are MATCHING PRODUCTS.
-    page_chunks = [c for c in chunks if c["meta"].get("type") != "product"]
 
-    # 2) Product cards — only when genuinely relevant:
-    #    a) product chunks retrieved with a strong score, or
-    #    b) a strong fuzzy name/category match. Avoids dumping products on
-    #       unrelated questions ("return policy", "where are you", etc.).
-    products, seen = [], set()
-    for c in chunks:
-        if (c["meta"].get("type") == "product"
-                and c.get("score", 0) >= config.PRODUCT_FLOOR):
-            p = c["meta"]["product"]
-            if p["id"] not in seen:
-                products.append(p)
-                seen.add(p["id"])
-    for p in store.search_products(message):     # uses raised MATCH_FLOOR
-        if p["id"] not in seen:
-            products.append(p)
-            seen.add(p["id"])
-    products = products[:config.VISUAL_RESULTS]
+def _build_context(hits: list[dict[str, Any]]) -> str:
+    parts = []
+    for h in hits:
+        p = h["payload"]
+        if p.get("type") == "product":
+            parts.append(
+                f"Product: {p['name']} | Price: {p['price']} {p['currency']} "
+                f"| Stock: {'In Stock' if p['in_stock'] else 'Out of Stock'} "
+                f"| SKU: {p.get('sku','')} | {p.get('description','')}"
+            )
+        else:
+            parts.append(f"Policy/FAQ: {p.get('title','')}\n{p.get('content','')}")
+    return "\n\n".join(parts)
 
-    # 3) Generate the grounded spoken answer.
-    # Give up only if we have neither website text nor matching products.
-    if not page_chunks and not products:
-        fallback = {
-            "en": "Sorry, I couldn't find that on our store. Please contact Hubmicroo support.",
-            "ur": "معاف کیجیے، یہ ہمارے اسٹور پر نہیں ملا۔ براہ کرم ہب مائیکرو سپورٹ سے رابطہ کریں۔",
-            "ar": "عذرًا، لم أجد ذلك في متجرنا. يرجى التواصل مع دعم هب مايكرو.",
+
+def _extract_product_cards(
+    hits: list[dict[str, Any]], threshold: float
+) -> list[dict[str, Any]]:
+    cards = []
+    for h in hits:
+        p = h["payload"]
+        if p.get("type") == "product" and h["score"] >= threshold:
+            cards.append({
+                "id": p["id"],
+                "name": p["name"],
+                "price": p["price"],
+                "currency": p.get("currency", "PKR"),
+                "in_stock": p["in_stock"],
+                "image_url": p.get("image_url", ""),
+                "buy_url": p.get("buy_url", ""),
+                "category": p.get("category", ""),
+            })
+            if len(cards) >= settings.MAX_PRODUCT_CARDS:
+                break
+    return cards
+
+
+def _greeting_response(lang: str) -> dict[str, Any]:
+    greetings = {
+        "en": settings.GREETING_EN,
+        "ur": settings.GREETING_UR,
+        "ar": settings.GREETING_AR,
+    }
+    return {"answer": greetings.get(lang, settings.GREETING_EN), "products": [], "lang": lang, "cached": False}
+
+
+def _fallback_response(lang: str) -> dict[str, Any]:
+    fallbacks = {
+        "en": settings.FALLBACK_EN,
+        "ur": settings.FALLBACK_UR,
+        "ar": settings.FALLBACK_AR,
+    }
+    return {"answer": fallbacks.get(lang, settings.FALLBACK_EN), "products": [], "lang": lang, "cached": False}
+
+
+def answer(message: str, language: str | None = None) -> dict[str, Any]:
+    """Full pipeline: text in → grounded answer + product cards out.
+
+    Returns:
+        {answer: str, products: list[dict], lang: str, cached: bool}
+    """
+    lang = language or detect_language(message)
+    msg_type = classify(message)
+
+    if msg_type == "greeting":
+        return _greeting_response(lang)
+
+    # ── Query rewrite ──────────────────────────────────────────────────────
+    search_query = _rewrite_query(message)
+
+    # ── Semantic cache check ───────────────────────────────────────────────
+    cache = get_cache()
+    query_vec = embed_text(search_query)
+    cached = cache.get(query_vec)
+    if cached:
+        logger.debug("Cache hit for query: %s", search_query[:60])
+        return {
+            "answer": cached.answer,
+            "products": cached.products,
+            "lang": cached.lang,
+            "cached": True,
         }
-        return {"answer": fallback[lang], "language": lang,
-                "products": products, "sources": []}
 
-    system = _SYSTEM.format(language=config.LANG_NAMES[lang],
-                            spoken=config.SPOKEN_RESULTS)
-    # Products are passed only via MATCHING PRODUCTS, so the model can't invent
-    # them and won't volunteer products when the list is empty.
-    user = (
-        f"WEBSITE INFO:\n{_context(page_chunks) or '(none)'}\n\n"
-        f"MATCHING PRODUCTS (use ONLY these, with exact names and prices; "
-        f"if empty, do NOT mention any products):\n{_products_block(products)}\n\n"
-        f"CUSTOMER QUESTION: {message}"
-    )
-    try:
-        text = llm.chat(system, user)
-    except llm.LLMError as e:
-        return {"answer": str(e), "language": lang, "products": products,
-                "sources": [], "error": True}
+    # ── Retrieval ──────────────────────────────────────────────────────────
+    hits = retrieve(search_query, top_k=settings.RETRIEVAL_TOP_K)
+    if not hits:
+        return _fallback_response(lang)
 
-    sources = list({c["meta"].get("url") for c in page_chunks if c["meta"].get("url")})
-    return {"answer": text, "language": lang, "products": products, "sources": sources}
+    # ── Product cards — only for demanded products above score floor ───────
+    product_cards = _extract_product_cards(hits, threshold=settings.PRODUCT_FLOOR)
+
+    # ── Route: skip LLM for pure lookup ────────────────────────────────────
+    if msg_type == "lookup" and product_cards:
+        # Template answer — no LLM
+        names = ", ".join(c["name"] for c in product_cards)
+        if lang == "ur":
+            ans = f"Ji haan, hamare paas yeh available hai: {names}."
+        elif lang == "ar":
+            ans = f"نعم، لدينا المنتجات التالية: {names}."
+        else:
+            ans = f"Here's what I found for you: {names}."
+    else:
+        # ── LLM grounded answer ────────────────────────────────────────
+        context = _build_context(hits)
+        prompt = (
+            f"CONTEXT:\n{context}\n\n"
+            f"USER QUESTION: {message}\n\n"
+            f"ANSWER:"
+        )
+        try:
+            ans = generate(prompt, system=_SYSTEM)
+        except Exception as exc:
+            logger.error("LLM error: %s", exc)
+            return _fallback_response(lang)
+
+    # ── Cache the result ───────────────────────────────────────────────────
+    cache.set(query_vec, ans, product_cards, lang)
+
+    return {
+        "answer": ans,
+        "products": product_cards,
+        "lang": lang,
+        "cached": False,
+    }

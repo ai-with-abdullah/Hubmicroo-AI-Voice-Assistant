@@ -1,88 +1,95 @@
-"""Live product data from your real website (or the bundled demo catalogue).
+"""Qdrant vector store wrapper — upsert, delete-by-id, search.
 
-This is the "connect to the website to fetch real data" layer. It never trains
-anything — it just reads your current products so answers and cards are live.
+Manages a single collection with both dense and payload fields.
+BM25 is maintained separately in retrieval.py using rank_bm25 on the raw corpus.
 """
-import json
+from __future__ import annotations
 
-import requests
-from rapidfuzz import fuzz
+import logging
+import uuid
+from typing import Any
 
-from . import config
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qm
+
+from .config import get_settings
+
+logger = logging.getLogger(__name__)
+
+settings = get_settings()
 
 
-def _headers():
-    return {"Authorization": f"Bearer {config.STORE_API_KEY}"} if config.STORE_API_KEY else {}
+def _client() -> QdrantClient:
+    return QdrantClient(url=settings.QDRANT_URL, timeout=30)
 
 
-def _normalize(raw: dict) -> dict:
-    """Map a raw product from any store shape into our standard fields."""
-    fm = config.FIELD_MAP
+def ensure_collection(dim: int = 1024) -> None:
+    """Create collection if it doesn't exist."""
+    client = _client()
+    existing = {c.name for c in client.get_collections().collections}
+    if settings.QDRANT_COLLECTION not in existing:
+        client.create_collection(
+            collection_name=settings.QDRANT_COLLECTION,
+            vectors_config=qm.VectorParams(
+                size=dim,
+                distance=qm.Distance.COSINE,
+            ),
+        )
+        logger.info("Created Qdrant collection '%s'", settings.QDRANT_COLLECTION)
+
+
+def upsert(doc_id: str, vector: list[float], payload: dict[str, Any]) -> None:
+    """Insert or update a single document by its string ID."""
+    client = _client()
+    # Qdrant needs integer or UUID point IDs — convert string ID to UUID
+    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, doc_id))
+    client.upsert(
+        collection_name=settings.QDRANT_COLLECTION,
+        points=[
+            qm.PointStruct(
+                id=point_id,
+                vector=vector,
+                payload={**payload, "_doc_id": doc_id},
+            )
+        ],
+    )
+
+
+def delete_by_doc_id(doc_id: str) -> None:
+    """Delete a document by its original string ID."""
+    client = _client()
+    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, doc_id))
+    client.delete(
+        collection_name=settings.QDRANT_COLLECTION,
+        points_selector=qm.PointIdsList(points=[point_id]),
+    )
+
+
+def search(
+    vector: list[float], top_k: int = 5, doc_type: str | None = None
+) -> list[dict[str, Any]]:
+    """Dense search. Returns list of {score, payload} dicts."""
+    client = _client()
+    filt = None
+    if doc_type:
+        filt = qm.Filter(
+            must=[qm.FieldCondition(key="type", match=qm.MatchValue(value=doc_type))]
+        )
+    hits = client.search(
+        collection_name=settings.QDRANT_COLLECTION,
+        query_vector=vector,
+        limit=top_k,
+        query_filter=filt,
+        with_payload=True,
+    )
+    return [{"score": h.score, "payload": h.payload} for h in hits]
+
+
+def collection_stats() -> dict[str, Any]:
+    client = _client()
+    info = client.get_collection(settings.QDRANT_COLLECTION)
     return {
-        "id": str(raw.get(fm["id"], "")),
-        "name": raw.get(fm["name"], ""),
-        "name_ur": raw.get("name_ur", ""),
-        "name_ar": raw.get("name_ar", ""),
-        "price": raw.get(fm["price"]),
-        "currency": raw.get(fm["currency"], config.DEFAULT_CURRENCY),
-        "in_stock": bool(raw.get(fm["in_stock"], True)),
-        "image": raw.get(fm["image"], ""),
-        "url": raw.get(fm["url"], ""),
-        "description": raw.get(fm["description"], ""),
-        "category": raw.get(fm["category"], ""),
-        "brand": raw.get(fm["brand"], ""),
-        "features": raw.get("features", []),
+        "points_count": info.points_count,
+        "status": info.status.value,
+        "vector_size": info.config.params.vectors.size,
     }
-
-
-def get_all_products() -> list:
-    """Full catalogue — from your live website if configured, else demo file."""
-    if config.STORE_CATALOGUE_URL:
-        r = requests.get(config.STORE_CATALOGUE_URL, headers=_headers(),
-                         timeout=config.STORE_TIMEOUT)
-        r.raise_for_status()
-        data = r.json()
-        items = data.get("products", data) if isinstance(data, dict) else data
-        return [_normalize(p) for p in items]
-    raw = json.loads(config.PRODUCTS_FILE.read_text(encoding="utf-8"))
-    return [_normalize(p) for p in raw]
-
-
-def _searchable_text(p: dict) -> str:
-    parts = [p["name"], p.get("name_ur", ""), p.get("name_ar", ""),
-             p.get("category", ""), p.get("brand", ""),
-             " ".join(p.get("features", [])), p.get("description", "")]
-    return " ".join(x for x in parts if x)
-
-
-def search_products(query: str, limit: int = None) -> list:
-    """Return product cards matching the query.
-
-    Uses your website's own search endpoint if configured; otherwise does fast
-    fuzzy matching over the catalogue (no ML, instant).
-    """
-    limit = limit or config.VISUAL_RESULTS
-    if config.STORE_SEARCH_URL:
-        r = requests.get(config.STORE_SEARCH_URL, params={"q": query},
-                         headers=_headers(), timeout=config.STORE_TIMEOUT)
-        r.raise_for_status()
-        data = r.json()
-        items = data.get("products", data) if isinstance(data, dict) else data
-        return [_normalize(p) for p in items][:limit]
-
-    scored = []
-    for p in get_all_products():
-        score = fuzz.token_set_ratio(query.lower(), _searchable_text(p).lower())
-        if score >= config.MATCH_FLOOR:
-            scored.append((score, p))
-    scored.sort(key=lambda x: -x[0])
-    return [p for _, p in scored[:limit]]
-
-
-def add_local_product(product: dict) -> dict:
-    """Append a product to the demo catalogue (used by the admin panel)."""
-    raw = json.loads(config.PRODUCTS_FILE.read_text(encoding="utf-8"))
-    raw.append(product)
-    config.PRODUCTS_FILE.write_text(
-        json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
-    return _normalize(product)

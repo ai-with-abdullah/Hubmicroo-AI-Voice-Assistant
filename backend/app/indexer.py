@@ -1,90 +1,135 @@
-"""Build / update the RAG index.
+"""Incremental indexer — upsert or delete a single item without full rebuild.
 
-IMPORTANT (matches the agreed design): indexing runs only when content changes
-— a product is added/edited, or the admin clicks "Re-index". It does NOT run on
-every user message. At query time we only *retrieve*, which is cheap.
-
-It turns products + website pages into embedded text chunks in the vector store.
+Builds a text representation of each product/page, embeds it, then upserts
+into the vector store. Also maintains the BM25 corpus on disk so retrieval.py
+can reload it without re-embedding everything.
 """
+from __future__ import annotations
+
 import json
+import logging
+import os
+from pathlib import Path
+from typing import Any
 
-from . import config, llm, store
-from .vectorstore import VectorStore
+from .config import get_settings
+from .embedder import embed_text
+from . import store
 
-# One shared in-memory store, loaded from disk.
-VS = VectorStore()
+logger = logging.getLogger(__name__)
+settings = get_settings()
 
-
-def _chunk(text: str):
-    text = " ".join(text.split())
-    if not text:
-        return []
-    size, overlap = config.CHUNK_SIZE, config.CHUNK_OVERLAP
-    chunks, start = [], 0
-    while start < len(text):
-        chunks.append(text[start:start + size])
-        start += size - overlap
-    return chunks
+_BM25_CORPUS_FILE = Path(settings.DATA_DIR) / "bm25_corpus.json"
 
 
-def _product_document(p: dict) -> str:
-    stock = "in stock" if p["in_stock"] else "out of stock"
-    names = " / ".join(x for x in [p["name"], p.get("name_ur"), p.get("name_ar")] if x)
-    feats = ", ".join(p.get("features", []))
-    return (
-        f"Product: {names}. Category: {p.get('category')}. Brand: {p.get('brand')}. "
-        f"Price: {p.get('price')} {p.get('currency')}. Availability: {stock}. "
-        f"Features: {feats}. {p.get('description', '')} Link: {p.get('url')}"
-    )
+def _product_text(p: dict[str, Any]) -> str:
+    """Flatten a product dict into a searchable text blob."""
+    parts = [
+        p.get("name", ""),
+        p.get("description", ""),
+        p.get("category", ""),
+        f"price {p.get('price', '')} {p.get('currency', 'PKR')}",
+        f"sku {p.get('sku', '')}",
+        " ".join(p.get("tags", [])),
+        f"stock {'available' if p.get('in_stock', True) else 'out of stock'}",
+    ]
+    return " | ".join(x for x in parts if x.strip())
 
 
-def index_product(p: dict):
-    """Incrementally (re)index a single product."""
-    VS.clear_source(p["id"])
-    doc = _product_document(p)
-    embeddings = llm.embed([doc])
-    VS.add([{
-        "text": doc,
-        "source_id": p["id"],
-        "meta": {"type": "product", "product": p},
-    }], embeddings)
-    VS.save()
+def _page_text(pg: dict[str, Any]) -> str:
+    return f"{pg.get('title', '')} | {pg.get('content', '')}"
 
 
-def index_pages(pages):
-    """pages: list of {url, title, text} — policies, FAQ, about, shipping ..."""
-    for page in pages:
-        VS.clear_source(page["url"])
-        chunks = _chunk(page.get("text", ""))
-        if not chunks:
-            continue
-        embeddings = llm.embed(chunks)
-        VS.add([{
-            "text": c,
-            "source_id": page["url"],
-            "meta": {"type": "page", "title": page.get("title", ""), "url": page["url"]},
-        } for c in chunks], embeddings)
-    VS.save()
+def _load_corpus() -> dict[str, str]:
+    """Load the BM25 corpus: {doc_id: text}."""
+    if _BM25_CORPUS_FILE.exists():
+        return json.loads(_BM25_CORPUS_FILE.read_text())
+    return {}
 
 
-def _load_pages():
-    if config.PAGES_FILE.exists():
-        return json.loads(config.PAGES_FILE.read_text(encoding="utf-8"))
-    return []
+def _save_corpus(corpus: dict[str, str]) -> None:
+    _BM25_CORPUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _BM25_CORPUS_FILE.write_text(json.dumps(corpus, ensure_ascii=False, indent=2))
 
 
-def reindex_all() -> dict:
-    """Full rebuild: every product + every page. Run on big content changes."""
-    VS.clear_all()
-    products = store.get_all_products()
-    if products:
-        docs = [_product_document(p) for p in products]
-        embeddings = llm.embed(docs)
-        VS.add([{
-            "text": docs[i],
-            "source_id": products[i]["id"],
-            "meta": {"type": "product", "product": products[i]},
-        } for i in range(len(products))], embeddings)
-    index_pages(_load_pages())
-    VS.save()
-    return {"products": len(products), "chunks": len(VS)}
+def index_product(product: dict[str, Any]) -> None:
+    """Upsert a single product into the vector store and BM25 corpus."""
+    doc_id = f"product:{product['id']}"
+    text = _product_text(product)
+    vector = embed_text(text)
+
+    payload = {
+        "type": "product",
+        "id": product["id"],
+        "name": product.get("name", ""),
+        "description": product.get("description", ""),
+        "price": product.get("price", 0),
+        "currency": product.get("currency", "PKR"),
+        "in_stock": product.get("in_stock", True),
+        "image_url": product.get("image_url", ""),
+        "buy_url": product.get("buy_url", ""),
+        "category": product.get("category", ""),
+        "sku": product.get("sku", ""),
+        "tags": product.get("tags", []),
+        "_text": text,
+    }
+    store.upsert(doc_id, vector, payload)
+
+    corpus = _load_corpus()
+    corpus[doc_id] = text
+    _save_corpus(corpus)
+    logger.info("Indexed product %s", product["id"])
+
+
+def delete_product(product_id: str) -> None:
+    """Remove a product from both vector store and BM25 corpus."""
+    doc_id = f"product:{product_id}"
+    store.delete_by_doc_id(doc_id)
+
+    corpus = _load_corpus()
+    corpus.pop(doc_id, None)
+    _save_corpus(corpus)
+    logger.info("Deleted product %s", product_id)
+
+
+def index_page(page: dict[str, Any]) -> None:
+    """Upsert a FAQ/policy page."""
+    doc_id = f"page:{page['id']}"
+    text = _page_text(page)
+    vector = embed_text(text)
+
+    payload = {
+        "type": "page",
+        "id": page["id"],
+        "title": page.get("title", ""),
+        "content": page.get("content", ""),
+        "_text": text,
+    }
+    store.upsert(doc_id, vector, payload)
+
+    corpus = _load_corpus()
+    corpus[doc_id] = text
+    _save_corpus(corpus)
+    logger.info("Indexed page %s", page["id"])
+
+
+def rebuild_all() -> int:
+    """Full rebuild — admin only, rare. Returns count of indexed items."""
+    products_file = Path(settings.PRODUCTS_FILE)
+    pages_file = Path(settings.PAGES_FILE)
+
+    count = 0
+    if products_file.exists():
+        products = json.loads(products_file.read_text())
+        for p in products:
+            index_product(p)
+            count += 1
+
+    if pages_file.exists():
+        pages = json.loads(pages_file.read_text())
+        for pg in pages:
+            index_page(pg)
+            count += 1
+
+    logger.info("Full rebuild complete: %d items indexed", count)
+    return count

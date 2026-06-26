@@ -1,0 +1,450 @@
+[
+  {
+    "id": "en-001",
+    "lang": "en",
+    "query": "Do you have wireless headphones?",
+    "type": "product_lookup",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-002",
+    "lang": "en",
+    "query": "What is the price of the USB-C hub?",
+    "type": "product_lookup",
+    "expected_product_ids": ["p002"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-003",
+    "lang": "en",
+    "query": "I need a mechanical keyboard with RGB lighting for gaming under 10000 PKR",
+    "type": "product_lookup",
+    "expected_product_ids": ["p003"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-004",
+    "lang": "en",
+    "query": "Is the 4K monitor currently in stock?",
+    "type": "product_lookup",
+    "expected_product_ids": ["p006"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-005",
+    "lang": "en",
+    "query": "What are your shipping charges and how long does delivery take?",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "shipping"
+  },
+  {
+    "id": "en-006",
+    "lang": "en",
+    "query": "How do I return a product if it's damaged?",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "returns"
+  },
+  {
+    "id": "en-007",
+    "lang": "en",
+    "query": "Show me something to charge my laptop on the go",
+    "type": "product_lookup",
+    "expected_product_ids": ["p005"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-008",
+    "lang": "en",
+    "query": "I want a webcam for video calls that also has a ring light built in",
+    "type": "product_lookup",
+    "expected_product_ids": ["p007"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-009",
+    "lang": "en",
+    "query": "What payment methods do you accept? Can I pay on delivery?",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "payment"
+  },
+  {
+    "id": "en-010",
+    "lang": "en",
+    "query": "Do you sell microphones for podcasting?",
+    "type": "product_lookup",
+    "expected_product_ids": ["p011"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-011",
+    "lang": "en",
+    "query": "headphoens wirless bluetoth",
+    "type": "product_lookup",
+    "note": "misspelled — should still retrieve headphones",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-012",
+    "lang": "en",
+    "query": "mechnicl keybord rgb gaiming",
+    "type": "product_lookup",
+    "note": "heavily misspelled",
+    "expected_product_ids": ["p003"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-013",
+    "lang": "en",
+    "query": "I'm looking for something that can organise my desk cables, there are too many wires everywhere and it looks messy",
+    "type": "product_lookup",
+    "note": "long rambling query",
+    "expected_product_ids": ["p013"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-014",
+    "lang": "en",
+    "query": "Can you compare the headphones and earbuds? Which is better for commuting?",
+    "type": "conversational",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-015",
+    "lang": "en",
+    "query": "How long is the warranty on electronics?",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "warranty"
+  },
+  {
+    "id": "en-016",
+    "lang": "en",
+    "query": "smart plug wifi alexa",
+    "type": "product_lookup",
+    "expected_product_ids": ["p012"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-017",
+    "lang": "en",
+    "query": "HM-PB-005",
+    "type": "product_lookup",
+    "note": "SKU lookup",
+    "expected_product_ids": ["p005"],
+    "expected_policy": null
+  },
+  {
+    "id": "en-018",
+    "lang": "en",
+    "query": "I want something under 1000 PKR for my desk",
+    "type": "product_lookup",
+    "expected_product_ids": ["p012", "p013", "p015", "p016"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-001",
+    "lang": "ur",
+    "query": "kya aap ke paas wireless headphones hain?",
+    "type": "product_lookup",
+    "note": "romanized Urdu",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-002",
+    "lang": "ur",
+    "query": "USB-C hub ki kya qeemat hai?",
+    "type": "product_lookup",
+    "note": "romanized Urdu with English product name",
+    "expected_product_ids": ["p002"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-003",
+    "lang": "ur",
+    "query": "mujhe gaming keyboard chahiye RGB wala, budget 7000 se kam",
+    "type": "product_lookup",
+    "note": "romanized Urdu with price constraint",
+    "expected_product_ids": ["p003"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-004",
+    "lang": "ur",
+    "query": "shipping kitne din mein hoti hai aur charges kya hain?",
+    "type": "policy",
+    "note": "romanized Urdu shipping question",
+    "expected_product_ids": [],
+    "expected_policy": "shipping"
+  },
+  {
+    "id": "ur-005",
+    "lang": "ur",
+    "query": "واپسی کی پالیسی کیا ہے؟",
+    "type": "policy",
+    "note": "Urdu script",
+    "expected_product_ids": [],
+    "expected_policy": "returns"
+  },
+  {
+    "id": "ur-006",
+    "lang": "ur",
+    "query": "کیا آپ کے پاس پاور بینک ہے؟",
+    "type": "product_lookup",
+    "note": "Urdu script product lookup",
+    "expected_product_ids": ["p005"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-007",
+    "lang": "ur",
+    "query": "mujhe laptop stand chahiye jo fold ho sake aur portable bhi ho",
+    "type": "product_lookup",
+    "note": "romanized Urdu feature query",
+    "expected_product_ids": ["p009"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-008",
+    "lang": "ur",
+    "query": "yaar wireless mouse kya price hai aur stock mein hai?",
+    "type": "product_lookup",
+    "note": "romanized Urdu casual tone",
+    "expected_product_ids": ["p004"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-009",
+    "lang": "ur",
+    "query": "ادائیگی کے کون سے طریقے ہیں؟ کیا COD ملتا ہے؟",
+    "type": "policy",
+    "note": "Urdu script payment question",
+    "expected_product_ids": [],
+    "expected_policy": "payment"
+  },
+  {
+    "id": "ur-010",
+    "lang": "ur",
+    "query": "webcam chahiye ghar se kaam ke liye jo achi quality ka ho",
+    "type": "product_lookup",
+    "note": "romanized Urdu WFH query",
+    "expected_product_ids": ["p007"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-011",
+    "lang": "ur",
+    "query": "bhai koi sasta product batao 1000 rupay se kam mein",
+    "type": "product_lookup",
+    "note": "romanized Urdu budget query",
+    "expected_product_ids": ["p012", "p013", "p015", "p016"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-012",
+    "lang": "ur",
+    "query": "kya aap ke paas wireless headphones hain under 5000 PKR jo noise cancelling bhi ho",
+    "type": "product_lookup",
+    "note": "classic code-switched Urdu+English",
+    "expected_product_ids": ["p001"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-013",
+    "lang": "ur",
+    "query": "desk lamp lena hai jo wireless charging bhi kare",
+    "type": "product_lookup",
+    "note": "romanized Urdu multi-feature query",
+    "expected_product_ids": ["p008"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-014",
+    "lang": "ur",
+    "query": "earbuds aur headphones mein kya farq hai, kaun sa behtar hai?",
+    "type": "conversational",
+    "note": "romanized Urdu comparison",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "ur-015",
+    "lang": "ur",
+    "query": "wrreless hedphons",
+    "type": "product_lookup",
+    "note": "romanized Urdu heavily misspelled",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-001",
+    "lang": "ar",
+    "query": "هل لديكم سماعات بلوتوث لاسلكية؟",
+    "type": "product_lookup",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-002",
+    "lang": "ar",
+    "query": "ما هو سعر موزع USB-C؟",
+    "type": "product_lookup",
+    "expected_product_ids": ["p002"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-003",
+    "lang": "ar",
+    "query": "أريد لوحة مفاتيح ميكانيكية للألعاب",
+    "type": "product_lookup",
+    "expected_product_ids": ["p003"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-004",
+    "lang": "ar",
+    "query": "ما هي سياسة الإرجاع والاسترداد؟",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "returns"
+  },
+  {
+    "id": "ar-005",
+    "lang": "ar",
+    "query": "كم يستغرق التوصيل وما هي التكلفة؟",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "shipping"
+  },
+  {
+    "id": "ar-006",
+    "lang": "ar",
+    "query": "هل يوجد بنك طاقة محمول لشحن اللاب توب؟",
+    "type": "product_lookup",
+    "expected_product_ids": ["p005"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-007",
+    "lang": "ar",
+    "query": "أحتاج كاميرا ويب جيدة للعمل من المنزل",
+    "type": "product_lookup",
+    "expected_product_ids": ["p007"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-008",
+    "lang": "ar",
+    "query": "ما طرق الدفع المتاحة؟",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "payment"
+  },
+  {
+    "id": "ar-009",
+    "lang": "ar",
+    "query": "هل الشاشة 4K متوفرة في المخزون؟",
+    "type": "product_lookup",
+    "expected_product_ids": ["p006"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-010",
+    "lang": "ar",
+    "query": "أريد سماعة أذن لاسلكية بخاصية إلغاء الضوضاء وبطارية طويلة",
+    "type": "product_lookup",
+    "expected_product_ids": ["p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "ar-011",
+    "lang": "ar",
+    "query": "هل يمكنني إلغاء الطلب؟",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "faq-general"
+  },
+  {
+    "id": "ar-012",
+    "lang": "ar",
+    "query": "ما هو الضمان على المنتجات الإلكترونية؟",
+    "type": "policy",
+    "expected_product_ids": [],
+    "expected_policy": "warranty"
+  },
+  {
+    "id": "mixed-001",
+    "lang": "ur",
+    "query": "I need headphones لاسلكي under 5000",
+    "type": "product_lookup",
+    "note": "triple code-switch: English + Arabic + English price",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": null
+  },
+  {
+    "id": "mixed-002",
+    "lang": "ur",
+    "query": "laptop stand price kya hai aur delivery free hai kya?",
+    "type": "conversational",
+    "note": "product + shipping in one question",
+    "expected_product_ids": ["p009"],
+    "expected_policy": "shipping"
+  },
+  {
+    "id": "mixed-003",
+    "lang": "en",
+    "query": "whats the warrenty on the bluethooth headphnes how long does it last",
+    "type": "conversational",
+    "note": "multiple misspellings + warranty + product combo",
+    "expected_product_ids": ["p001", "p010"],
+    "expected_policy": "warranty"
+  },
+  {
+    "id": "greeting-001",
+    "lang": "en",
+    "query": "Hello!",
+    "type": "greeting",
+    "expected_product_ids": [],
+    "expected_policy": null
+  },
+  {
+    "id": "greeting-002",
+    "lang": "ur",
+    "query": "salam",
+    "type": "greeting",
+    "expected_product_ids": [],
+    "expected_policy": null
+  },
+  {
+    "id": "greeting-003",
+    "lang": "ar",
+    "query": "السلام عليكم",
+    "type": "greeting",
+    "expected_product_ids": [],
+    "expected_policy": null
+  },
+  {
+    "id": "oob-001",
+    "lang": "en",
+    "query": "Do you sell iPhones or laptops?",
+    "type": "out_of_catalogue",
+    "note": "should say not found, not invent products",
+    "expected_product_ids": [],
+    "expected_policy": null
+  },
+  {
+    "id": "oob-002",
+    "lang": "en",
+    "query": "What is the capital of France?",
+    "type": "out_of_scope",
+    "note": "completely off-topic — should deflect gracefully",
+    "expected_product_ids": [],
+    "expected_policy": null
+  }
+]

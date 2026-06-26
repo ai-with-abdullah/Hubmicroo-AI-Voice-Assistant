@@ -1,44 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hubmicroo — Demo Storefront</title>
-  <link rel="stylesheet" href="/static/assistant.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hubmicroo — Tech Accessories Store</title>
+  <link rel="stylesheet" href="/static/assistant.css">
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: #f1f5f9; color: #0f172a; }
-    header { background: linear-gradient(135deg,#6d28d9,#2563eb); color: #fff; padding: 28px 20px; }
-    header h1 { margin: 0; font-size: 24px; }
-    header p { margin: 6px 0 0; opacity: .9; }
-    .wrap { max-width: 900px; margin: 30px auto; padding: 0 16px; }
-    .hint { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; }
-    .hint code { background: #f1f5f9; padding: 2px 6px; border-radius: 5px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 16px; margin-top: 24px; }
-    .p { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; }
-    .p b { font-size: 14px; } .p .pr { color: #2563eb; font-weight: 700; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; }
+    .store-header { background: #1e293b; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    .store-header h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+    .store-header span { font-size: 13px; opacity: 0.6; }
+    .hero { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #fff; padding: 60px 24px; text-align: center; }
+    .hero h2 { font-size: 36px; font-weight: 800; margin-bottom: 12px; }
+    .hero p { font-size: 16px; opacity: 0.85; max-width: 520px; margin: 0 auto; }
+    .products-grid { max-width: 1100px; margin: 40px auto; padding: 0 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+    .product-tile { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: transform 0.2s, box-shadow 0.2s; }
+    .product-tile:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0,0,0,0.1); }
+    .product-tile-img { width: 100%; height: 160px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 52px; }
+    .product-tile-body { padding: 14px; }
+    .product-tile-name { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+    .product-tile-price { font-size: 15px; font-weight: 700; color: #2563eb; }
+    .widget-hint { text-align: center; padding: 24px; font-size: 14px; color: #64748b; }
+    .widget-hint kbd { background: #e2e8f0; padding: 2px 8px; border-radius: 6px; font-family: inherit; }
   </style>
 </head>
 <body>
-  <header>
+  <header class="store-header">
+    <div>🛍️</div>
     <h1>Hubmicroo</h1>
-    <p>Demo storefront — tap the 🎤 button at the bottom-right and ask in English, اردو or العربية.</p>
+    <span>Tech Accessories &amp; Gadgets</span>
   </header>
-  <div class="wrap">
-    <div class="hint">
-      Try saying or typing: <i>“Do you have wireless headphones under 5000?”</i>,
-      <i>“کیا آپ کے پاس بلوٹوتھ اسپیکر ہے؟”</i>, or <i>“ما هي سياسة الإرجاع؟”</i>.<br/>
-      Admin panel: <a href="/admin">/admin</a> &nbsp;·&nbsp; Health: <a href="/api/health">/api/health</a>
-    </div>
-    <div class="grid">
-      <div class="p"><b>Wireless Bluetooth Headphones</b><div class="pr">4500 PKR</div></div>
-      <div class="p"><b>Smart Watch Series 7</b><div class="pr">8900 PKR</div></div>
-      <div class="p"><b>Portable Bluetooth Speaker</b><div class="pr">3200 PKR</div></div>
-      <div class="p"><b>USB-C Fast Charger 65W</b><div class="pr">2100 PKR</div></div>
-    </div>
+
+  <section class="hero">
+    <h2>Your Favourite Tech Store</h2>
+    <p>Quality accessories delivered across Pakistan. Ask our AI assistant anything — in English, Urdu, or Arabic.</p>
+  </section>
+
+  <div class="products-grid" id="products-grid">
+    <!-- populated dynamically or static fallback -->
+    <div class="product-tile"><div class="product-tile-img">🎧</div><div class="product-tile-body"><div class="product-tile-name">Wireless Headphones Pro</div><div class="product-tile-price">PKR 4,999</div></div></div>
+    <div class="product-tile"><div class="product-tile-img">🔌</div><div class="product-tile-body"><div class="product-tile-name">USB-C Hub 7-in-1</div><div class="product-tile-price">PKR 2,499</div></div></div>
+    <div class="product-tile"><div class="product-tile-img">⌨️</div><div class="product-tile-body"><div class="product-tile-name">Mechanical Keyboard RGB</div><div class="product-tile-price">PKR 6,999</div></div></div>
+    <div class="product-tile"><div class="product-tile-img">🖱️</div><div class="product-tile-body"><div class="product-tile-name">Ergonomic Wireless Mouse</div><div class="product-tile-price">PKR 1,999</div></div></div>
+    <div class="product-tile"><div class="product-tile-img">🔋</div><div class="product-tile-body"><div class="product-tile-name">Power Bank 20000mAh</div><div class="product-tile-price">PKR 3,499</div></div></div>
+    <div class="product-tile"><div class="product-tile-img">📷</div><div class="product-tile-body"><div class="product-tile-name">1080p Webcam + Ring Light</div><div class="product-tile-price">PKR 2,999</div></div></div>
   </div>
 
-  <!-- The widget. On your real site, host these two files and add these tags. -->
-  <script>window.HUBMICROO_API_BASE = "";</script>
+  <p class="widget-hint">💬 Tap the blue chat button below, or press <kbd>?</kbd> for help</p>
+
+  <script>
+    window.HM_API_BASE = "";  // same origin — change for cross-origin embed
+  </script>
   <script src="/static/assistant.js"></script>
 </body>
 </html>
