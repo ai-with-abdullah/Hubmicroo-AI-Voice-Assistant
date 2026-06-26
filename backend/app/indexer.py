@@ -19,7 +19,9 @@ from . import store
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_BM25_CORPUS_FILE = Path(settings.DATA_DIR) / "bm25_corpus.json"
+
+def _bm25_corpus_path() -> Path:
+    return Path(settings.DATA_DIR) / "bm25_corpus.json"
 
 
 def _product_text(p: dict[str, Any]) -> str:
@@ -42,14 +44,15 @@ def _page_text(pg: dict[str, Any]) -> str:
 
 def _load_corpus() -> dict[str, str]:
     """Load the BM25 corpus: {doc_id: text}."""
-    if _BM25_CORPUS_FILE.exists():
-        return json.loads(_BM25_CORPUS_FILE.read_text())
+    if _bm25_corpus_path().exists():
+        return json.loads(_bm25_corpus_path().read_text())
     return {}
 
 
 def _save_corpus(corpus: dict[str, str]) -> None:
-    _BM25_CORPUS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _BM25_CORPUS_FILE.write_text(json.dumps(corpus, ensure_ascii=False, indent=2))
+    p = _bm25_corpus_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(corpus, ensure_ascii=False, indent=2))
 
 
 def index_product(product: dict[str, Any]) -> None:

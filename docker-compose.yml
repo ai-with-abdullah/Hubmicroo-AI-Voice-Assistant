@@ -3,7 +3,7 @@ version: "3.9"
 services:
   # ── Qdrant vector store ────────────────────────────────────────────────────
   qdrant:
-    image: qdrant/qdrant:v1.12.4
+    image: qdrant/qdrant:latest
     restart: unless-stopped
     ports:
       - "6333:6333"
@@ -13,9 +13,12 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
       interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
 
-  # ── Ollama (LLM + optional embeddings) ────────────────────────────────────
+  # ── Ollama (LLM server) ────────────────────────────────────────────────────
+  # Strategy: run `ollama serve` as main process; pull model via a one-shot
+  # init container pattern using depends_on + a shell script.
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
@@ -23,16 +26,28 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    # Pull model on startup; change LLM_MODEL in .env to switch models
-    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull ${LLM_MODEL:-qwen3:4b} && wait"]
     environment:
-      - OLLAMA_KEEP_ALIVE=5m   # scale-to-zero: unload model after 5 min idle
+      - OLLAMA_KEEP_ALIVE=5m   # unload model after 5 min idle (scale-to-zero)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 20s
+      interval: 15s
       timeout: 10s
-      retries: 10
-      start_period: 120s
+      retries: 20
+      start_period: 30s
+
+  # ── Model pull (runs once after ollama is healthy, then exits) ────────────
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["ollama", "pull"]
+    command: ["${LLM_MODEL:-qwen3:4b}"]
+    restart: "no"
 
   # ── FastAPI backend ────────────────────────────────────────────────────────
   backend:
@@ -45,10 +60,15 @@ services:
     environment:
       - QDRANT_URL=http://qdrant:6333
       - OLLAMA_BASE_URL=http://ollama:11434
+      - DATA_DIR=/app/data
+      - PRODUCTS_FILE=/app/data/products.json
+      - PAGES_FILE=/app/data/pages.json
+      - FRONTEND_DIR=/app/frontend
+      - PIPER_VOICES_DIR=/app/piper_voices
     volumes:
-      - ./backend/data:/app/data          # persist data files
-      - piper_voices:/app/piper_voices    # persist downloaded voice models
-      - model_cache:/root/.cache          # persist HuggingFace BGE-M3 cache
+      - ./backend/data:/app/data        # persist product/page/BM25 data
+      - piper_voices:/app/piper_voices  # mount downloaded voice models
+      - hf_cache:/root/.cache           # persist HuggingFace BGE-M3 weights
     depends_on:
       qdrant:
         condition: service_healthy
@@ -59,10 +79,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 120s
 
 volumes:
   qdrant_data:
   ollama_data:
   piper_voices:
-  model_cache:
+  hf_cache:

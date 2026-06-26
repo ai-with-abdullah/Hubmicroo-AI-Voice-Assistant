@@ -1,31 +1,36 @@
 # ── Web framework ─────────────────────────────────────────────────────────────
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
-python-multipart==0.0.12
-pydantic==2.9.2
-pydantic-settings==2.6.1
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
 
 # ── Vector store ──────────────────────────────────────────────────────────────
-qdrant-client==1.12.1
-
-# ── Embeddings (BGE-M3) ────────────────────────────────────────────────────────
-FlagEmbedding==1.3.3
-torch==2.5.1
-transformers==4.46.3
-sentence-transformers==3.3.1
+# NOTE: qdrant-client ≥1.14 removed client.search() — use query_points() instead
+qdrant-client>=1.7.0
 
 # ── BM25 ──────────────────────────────────────────────────────────────────────
-rank-bm25==0.2.2
+rank-bm25>=0.2.2
 
-# ── LLM client ────────────────────────────────────────────────────────────────
-httpx==0.27.2
+# ── HTTP client (LLM + health checks) ────────────────────────────────────────
+httpx>=0.27.0
 
-# ── Speech-to-Text (Whisper) ──────────────────────────────────────────────────
-faster-whisper==1.1.0
+# ── Embeddings (BGE-M3, multilingual) ────────────────────────────────────────
+# Install torch first separately if on GPU: pip install torch --index-url https://download.pytorch.org/whl/cu121
+FlagEmbedding>=1.2.0
+torch>=2.1.0
+transformers>=4.40.0
+sentence-transformers>=2.7.0
 
-# ── Eval ──────────────────────────────────────────────────────────────────────
+# ── Speech-to-Text (Whisper, self-hosted) ────────────────────────────────────
+faster-whisper>=1.0.0
+# faster-whisper requires ctranslate2 which ships native libs — usually auto-installed
+# On some systems: pip install ctranslate2
+
+# ── Evaluation harness ────────────────────────────────────────────────────────
 # httpx already listed above

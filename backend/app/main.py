@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -222,7 +222,9 @@ def stats():
 
 
 # ── Serve frontend ─────────────────────────────────────────────────────────────
-_FRONTEND = "/app/frontend"
+# FRONTEND_DIR is set by config — defaults to project_root/frontend for local dev,
+# overridden to /app/frontend by the Dockerfile ENV var for Docker.
+_FRONTEND = settings.FRONTEND_DIR
 if os.path.isdir(_FRONTEND):
     app.mount("/static", StaticFiles(directory=_FRONTEND), name="static")
 
@@ -233,3 +235,5 @@ if os.path.isdir(_FRONTEND):
     @app.get("/admin", response_class=HTMLResponse)
     def admin_ui():
         return FileResponse(os.path.join(_FRONTEND, "admin.html"))
+else:
+    logger.warning("Frontend dir not found at %s — /  and /admin will return 404", _FRONTEND)

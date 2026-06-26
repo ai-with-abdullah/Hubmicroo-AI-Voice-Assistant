@@ -1,33 +1,38 @@
-"""Qdrant vector store wrapper — upsert, delete-by-id, search.
+"""Qdrant vector store wrapper — upsert, delete-by-id, search, retrieve.
 
-Manages a single collection with both dense and payload fields.
-BM25 is maintained separately in retrieval.py using rank_bm25 on the raw corpus.
+Uses qdrant-client ≥1.7 API (query_points, retrieve).
+client.search() was removed in qdrant-client 1.14+ — do NOT use it.
 """
 from __future__ import annotations
 
 import logging
 import uuid
+from functools import lru_cache
 from typing import Any
 
-from qdrant_client import QdrantClient
-from qdrant_client.http import models as qm
+from qdrant_client import QdrantClient, models as qm
 
 from .config import get_settings
 
 logger = logging.getLogger(__name__)
-
 settings = get_settings()
 
 
+@lru_cache(maxsize=1)
 def _client() -> QdrantClient:
+    """Return a singleton QdrantClient (created once per process)."""
     return QdrantClient(url=settings.QDRANT_URL, timeout=30)
 
 
+def _point_id(doc_id: str) -> str:
+    """Convert a string doc_id to a deterministic UUID for Qdrant."""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, doc_id))
+
+
 def ensure_collection(dim: int = 1024) -> None:
-    """Create collection if it doesn't exist."""
+    """Create the Qdrant collection if it doesn't exist yet."""
     client = _client()
-    existing = {c.name for c in client.get_collections().collections}
-    if settings.QDRANT_COLLECTION not in existing:
+    if not client.collection_exists(settings.QDRANT_COLLECTION):
         client.create_collection(
             collection_name=settings.QDRANT_COLLECTION,
             vectors_config=qm.VectorParams(
@@ -39,15 +44,13 @@ def ensure_collection(dim: int = 1024) -> None:
 
 
 def upsert(doc_id: str, vector: list[float], payload: dict[str, Any]) -> None:
-    """Insert or update a single document by its string ID."""
+    """Insert or update a single document."""
     client = _client()
-    # Qdrant needs integer or UUID point IDs — convert string ID to UUID
-    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, doc_id))
     client.upsert(
         collection_name=settings.QDRANT_COLLECTION,
         points=[
             qm.PointStruct(
-                id=point_id,
+                id=_point_id(doc_id),
                 vector=vector,
                 payload={**payload, "_doc_id": doc_id},
             )
@@ -56,40 +59,60 @@ def upsert(doc_id: str, vector: list[float], payload: dict[str, Any]) -> None:
 
 
 def delete_by_doc_id(doc_id: str) -> None:
-    """Delete a document by its original string ID."""
+    """Remove a document by its string ID."""
     client = _client()
-    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, doc_id))
     client.delete(
         collection_name=settings.QDRANT_COLLECTION,
-        points_selector=qm.PointIdsList(points=[point_id]),
+        points_selector=qm.PointIdsList(points=[_point_id(doc_id)]),
     )
 
 
 def search(
     vector: list[float], top_k: int = 5, doc_type: str | None = None
 ) -> list[dict[str, Any]]:
-    """Dense search. Returns list of {score, payload} dicts."""
+    """Dense vector search. Returns list of {score, payload} dicts."""
     client = _client()
-    filt = None
+
+    query_filter: qm.Filter | None = None
     if doc_type:
-        filt = qm.Filter(
-            must=[qm.FieldCondition(key="type", match=qm.MatchValue(value=doc_type))]
+        query_filter = qm.Filter(
+            must=[
+                qm.FieldCondition(
+                    key="type",
+                    match=qm.MatchValue(value=doc_type),
+                )
+            ]
         )
-    hits = client.search(
+
+    result = client.query_points(
         collection_name=settings.QDRANT_COLLECTION,
-        query_vector=vector,
+        query=vector,
+        query_filter=query_filter,
         limit=top_k,
-        query_filter=filt,
         with_payload=True,
+        with_vectors=False,
     )
-    return [{"score": h.score, "payload": h.payload} for h in hits]
+    return [{"score": p.score, "payload": p.payload} for p in result.points]
+
+
+def retrieve_by_doc_id(doc_id: str) -> dict[str, Any] | None:
+    """Fetch a document's payload by its string ID (exact lookup, no vector needed)."""
+    client = _client()
+    points = client.retrieve(
+        collection_name=settings.QDRANT_COLLECTION,
+        ids=[_point_id(doc_id)],
+        with_payload=True,
+        with_vectors=False,
+    )
+    return points[0].payload if points else None
 
 
 def collection_stats() -> dict[str, Any]:
     client = _client()
     info = client.get_collection(settings.QDRANT_COLLECTION)
+    vectors_cfg = info.config.params.vectors
     return {
         "points_count": info.points_count,
-        "status": info.status.value,
-        "vector_size": info.config.params.vectors.size,
+        "status": str(info.status),
+        "vector_size": vectors_cfg.size if hasattr(vectors_cfg, "size") else "n/a",
     }

@@ -3,8 +3,14 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
+
+# Compute default data dir relative to this file so local dev works without .env
+_APP_DIR = Path(__file__).parent          # backend/app/
+_DATA_DIR = _APP_DIR.parent / "data"      # backend/data/
+_FRONTEND_DIR = _APP_DIR.parent.parent / "frontend"  # project_root/frontend/
 
 
 class Settings(BaseSettings):
@@ -37,7 +43,6 @@ class Settings(BaseSettings):
     # ── Voice ─────────────────────────────────────────────────────────────
     WHISPER_MODEL: str = "base"      # tiny/base/small/medium
     WHISPER_DEVICE: str = "cpu"
-    PIPER_VOICES_DIR: str = "/app/piper_voices"
     PIPER_VOICE_EN: str = "en_US-lessac-medium"
     PIPER_VOICE_UR: str = "ur_PK-usman-medium"
     PIPER_VOICE_AR: str = "ar_JO-kareem-low"
@@ -54,10 +59,13 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # ── Paths ─────────────────────────────────────────────────────────────
-    DATA_DIR: str = "/app/data"
-    PRODUCTS_FILE: str = "/app/data/products.json"
-    PAGES_FILE: str = "/app/data/pages.json"
+    # ── Paths — defaults resolve relative to source so local dev works ───────
+    # Docker overrides these via ENV vars in the Dockerfile / docker-compose
+    DATA_DIR: str = str(_DATA_DIR)
+    PRODUCTS_FILE: str = str(_DATA_DIR / "products.json")
+    PAGES_FILE: str = str(_DATA_DIR / "pages.json")
+    FRONTEND_DIR: str = str(_FRONTEND_DIR)
+    PIPER_VOICES_DIR: str = str(_APP_DIR.parent.parent / "piper_voices")
 
     # ── Greetings / fallback messages ─────────────────────────────────────
     GREETING_EN: str = "Hi! I'm the Hubmicroo shopping assistant. How can I help you today?"

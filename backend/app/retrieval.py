@@ -1,6 +1,7 @@
 """Hybrid retrieval: dense (BGE-M3 via Qdrant) + sparse (BM25 via rank-bm25).
 
-Scores are fused using weighted reciprocal rank fusion, then thresholded.
+Scores are fused with weighted linear combination, then returned ranked.
+BM25 corpus is maintained on disk by indexer.py and hot-reloaded on change.
 """
 from __future__ import annotations
 
@@ -17,9 +18,11 @@ from . import store
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-_BM25_CORPUS_FILE = Path(settings.DATA_DIR) / "bm25_corpus.json"
 
-# ── BM25 index (rebuilt when corpus changes) ──────────────────────────────────
+def _bm25_corpus_path() -> Path:
+    return Path(settings.DATA_DIR) / "bm25_corpus.json"
+
+# ── BM25 index (lazy-loaded, refreshed when corpus file mtime changes) ────────
 
 _bm25_index: Any = None
 _bm25_doc_ids: list[str] = []
@@ -30,20 +33,20 @@ def _tokenize(text: str) -> list[str]:
     return re.sub(r"[^\w\s]", " ", text.lower()).split()
 
 
-def _get_bm25():
-    """Lazy-load or refresh BM25 index when corpus file changes."""
+def _get_bm25() -> tuple[Any, list[str]]:
+    """Return (BM25Okapi instance, doc_id list), refreshing if corpus changed."""
     global _bm25_index, _bm25_doc_ids, _bm25_corpus_mtime
 
-    if not _BM25_CORPUS_FILE.exists():
+    if not _bm25_corpus_path().exists():
         return None, []
 
-    mtime = _BM25_CORPUS_FILE.stat().st_mtime
+    mtime = _bm25_corpus_path().stat().st_mtime
     if _bm25_index is not None and mtime == _bm25_corpus_mtime:
         return _bm25_index, _bm25_doc_ids
 
     from rank_bm25 import BM25Okapi  # noqa: PLC0415
 
-    corpus_map: dict[str, str] = json.loads(_BM25_CORPUS_FILE.read_text())
+    corpus_map: dict[str, str] = json.loads(_bm25_corpus_path().read_text())
     _bm25_doc_ids = list(corpus_map.keys())
     tokenized = [_tokenize(v) for v in corpus_map.values()]
     _bm25_index = BM25Okapi(tokenized)
@@ -52,69 +55,69 @@ def _get_bm25():
     return _bm25_index, _bm25_doc_ids
 
 
-# ── Retrieval ─────────────────────────────────────────────────────────────────
+# ── Main retrieval function ───────────────────────────────────────────────────
 
 def retrieve(
     query: str,
     top_k: int | None = None,
     doc_type: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Hybrid retrieve: returns ranked list of {score, payload} dicts.
+    """Hybrid retrieve. Returns ranked list of {score, payload} dicts.
 
-    *doc_type* can be 'product', 'page', or None (both).
+    *doc_type* filters to 'product', 'page', or None (all).
     """
     k = top_k or settings.RETRIEVAL_TOP_K
+    fetch_k = k * 3  # fetch more candidates to allow re-ranking
+
     query_vec = embed_text(query)
 
-    # ── Dense retrieval ────────────────────────────────────────────────
-    dense_hits = store.search(query_vec, top_k=k * 2, doc_type=doc_type)
-    dense_map: dict[str, float] = {
-        h["payload"]["_doc_id"]: h["score"] for h in dense_hits
-    }
+    # ── Dense retrieval ────────────────────────────────────────────────────
+    dense_hits = store.search(query_vec, top_k=fetch_k, doc_type=doc_type)
+    dense_map: dict[str, float] = {}
+    payload_by_id: dict[str, dict] = {}
+    for h in dense_hits:
+        doc_id = h["payload"]["_doc_id"]
+        dense_map[doc_id] = h["score"]
+        payload_by_id[doc_id] = h["payload"]
 
-    # ── BM25 retrieval ─────────────────────────────────────────────────
+    # ── BM25 retrieval ─────────────────────────────────────────────────────
     bm25_map: dict[str, float] = {}
     bm25_index, bm25_doc_ids = _get_bm25()
-    if bm25_index is not None:
+    if bm25_index is not None and bm25_doc_ids:
         q_tokens = _tokenize(query)
-        scores = bm25_index.get_scores(q_tokens)
-        # Normalise BM25 scores to [0, 1]
-        max_s = max(scores) if scores.max() > 0 else 1.0
-        for doc_id, raw_score in zip(bm25_doc_ids, scores):
+        raw_scores = bm25_index.get_scores(q_tokens)
+        max_s = float(raw_scores.max()) if raw_scores.max() > 0 else 1.0
+        for doc_id, raw in zip(bm25_doc_ids, raw_scores):
+            # Filter by doc_type if requested
             if doc_type and not doc_id.startswith(doc_type):
                 continue
-            bm25_map[doc_id] = float(raw_score) / max_s
+            if raw > 0:
+                bm25_map[doc_id] = float(raw) / max_s
 
-    # ── Fuse scores ───────────────────────────────────────────────────
+    # ── Fuse scores ────────────────────────────────────────────────────────
     all_ids = set(dense_map) | set(bm25_map)
     fused: list[tuple[str, float]] = []
     for doc_id in all_ids:
-        d_score = dense_map.get(doc_id, 0.0)
-        b_score = bm25_map.get(doc_id, 0.0)
-        fused_score = (
-            settings.DENSE_WEIGHT * d_score + settings.BM25_WEIGHT * b_score
+        score = (
+            settings.DENSE_WEIGHT * dense_map.get(doc_id, 0.0)
+            + settings.BM25_WEIGHT * bm25_map.get(doc_id, 0.0)
         )
-        fused.append((doc_id, fused_score))
+        fused.append((doc_id, score))
 
     fused.sort(key=lambda x: x[1], reverse=True)
+    top = fused[:k]
 
-    # Rebuild result list from dense hits (payload already fetched)
-    payload_by_id = {h["payload"]["_doc_id"]: h["payload"] for h in dense_hits}
+    # ── Fetch payloads for BM25-only hits not in dense results ────────────
+    missing = [doc_id for doc_id, _ in top if doc_id not in payload_by_id]
+    for doc_id in missing:
+        payload = store.retrieve_by_doc_id(doc_id)
+        if payload:
+            payload_by_id[doc_id] = payload
+            logger.debug("Fetched BM25-only payload for %s", doc_id)
 
-    # For BM25-only hits we need to load from Qdrant payload — use a search
-    # with a very high threshold to avoid re-fetching dense hits.
-    missing = [doc_id for doc_id, _ in fused[:k] if doc_id not in payload_by_id]
-    if missing:
-        # Fetch by exact BM25 doc_ids that weren't in dense results
-        for doc_id in missing:
-            hits = store.search(query_vec, top_k=1, doc_type=None)
-            for h in hits:
-                if h["payload"].get("_doc_id") == doc_id:
-                    payload_by_id[doc_id] = h["payload"]
-                    break
-
+    # ── Build final result list ────────────────────────────────────────────
     results = []
-    for doc_id, score in fused[:k]:
+    for doc_id, score in top:
         if doc_id in payload_by_id:
             results.append({"score": score, "payload": payload_by_id[doc_id]})
 
