@@ -72,9 +72,9 @@ class Settings(BaseSettings):
     PIPER_VOICES_DIR: str = str(_APP_DIR.parent.parent / "piper_voices")
 
     # ── Greetings / fallback messages ─────────────────────────────────────
-    GREETING_EN: str = "Hi! I'm the Hubmicroo shopping assistant. How can I help you today?"
-    GREETING_UR: str = "Salam! Main Hubmicroo ka shopping assistant hoon. Aap ki kya madad kar sakta hoon?"
-    GREETING_AR: str = "مرحباً! أنا مساعد تسوق هبمايكرو. كيف يمكنني مساعدتك؟"
+    GREETING_EN: str = "Hey, good to see you! Ask me about any product, price, shipping or warranty — I'm ready to help."
+    GREETING_UR: str = "Salam! Kaisay hain aap? Koi bhi product, price, ya delivery ke baare mein poochein — main haazir hoon!"
+    GREETING_AR: str = "أهلاً وسهلاً! كيف حالك؟ اسألني عن أي منتج أو سعر أو شحن — أنا هنا للمساعدة!"
     FALLBACK_EN: str = "I couldn't find what you're looking for. Would you like to contact our support team?"
     FALLBACK_UR: str = "Mujhe yeh nahi mila. Kya aap hamare support team se baat karna chahenge?"
     FALLBACK_AR: str = "لم أتمكن من العثور على ما تبحث عنه. هل تريد التواصل مع فريق الدعم؟"

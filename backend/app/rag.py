@@ -46,7 +46,7 @@ _OOB_SIGNALS = re.compile(
     r'\b(iphones?|ipads?|macbooks?|airpods?|smartphones?|'
     r'samsung\s+(phone|galaxy)|android\s+(phone|smartphone)|'
     r'mobile\s+phone|mobile\s+fone|need\s+mobile|want\s+mobile|buy\s+mobile|'
-    r'lana\s+chata|mobile\s+lana|phone\s+lana|'
+    r'mobile\s+lana|phone\s+lana|'
     r'gaming\s+laptop|windows\s+laptop|desktop\s+pc|'
     r'playstation|ps[45]|xbox|nintendo)\b',
     re.IGNORECASE,
