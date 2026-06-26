@@ -6,6 +6,7 @@ Product cards appear only when products genuinely match the user's intent.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from .config import get_settings
@@ -32,18 +33,38 @@ _SYSTEM = (
 
 # ── Query rewrite prompt ───────────────────────────────────────────────────────
 _REWRITE_PROMPT = (
-    "Condense the following customer message into a short search intent "
-    "(max 10 words, keep product names/SKUs exact). "
-    "Output ONLY the condensed query, nothing else.\n\nMessage: {msg}"
+    "Correct any spelling mistakes, translate non-English text to English if needed, "
+    "and condense the customer message into a short English search query "
+    "(max 8 words, keep product names/SKUs exact). "
+    "Output ONLY the search query, nothing else.\n\nMessage: {msg}"
+)
+
+# Known out-of-catalogue items — when detected, suppress product cards so the
+# LLM can tell the user we don't carry them without showing a false match.
+_OOB_SIGNALS = re.compile(
+    r'\b(iphone|ipad|macbook|airpod|'
+    r'samsung\s+(phone|galaxy)|android\s+phone|'
+    r'gaming\s+laptop|windows\s+laptop|desktop\s+pc|'
+    r'playstation|ps[45]|xbox|nintendo)\b',
+    re.IGNORECASE,
 )
 
 
 def _rewrite_query(message: str) -> str:
-    """Shorten a long/rambling message to a tight search intent."""
-    if len(message.split()) <= 8:
-        return message  # already short — skip LLM call
+    """Spell-correct, translate, and condense any query to a tight English search intent.
+
+    Always calls the LLM so that typo-heavy or short non-English queries are
+    corrected before embedding — crucial for BM25 which only covers English text.
+    """
     try:
-        return generate(_REWRITE_PROMPT.format(msg=message)).strip()
+        raw = generate(_REWRITE_PROMPT.format(msg=message)).strip()
+        if not raw:
+            return message
+        # Take the last non-empty line; models sometimes prepend a preamble
+        lines = [l.strip() for l in raw.splitlines() if l.strip()]
+        result = lines[-1] if lines else message
+        # Guard: if the model ignored the instruction and returned something huge, fall back
+        return result if result and len(result.split()) <= 20 else message
     except Exception:
         return message
 
@@ -136,11 +157,16 @@ def answer(message: str, language: str | None = None) -> dict[str, Any]:
     if not hits:
         return _fallback_response(lang)
 
-    # ── Product cards — conversational queries (comparisons, indirect) get a
-    # lower threshold so both referenced products are returned even when the
-    # fused score is moderate.  All other types use PRODUCT_FLOOR.
+    # ── Product cards ──────────────────────────────────────────────────────
+    # Conversational queries (comparisons, indirect lookups) use a lower
+    # threshold so both referenced products surface even at moderate scores.
+    # Out-of-catalogue signals (iphone, gaming laptop…) force zero cards so
+    # the LLM can answer "we don't sell X" without returning a false match.
     card_threshold = 0.20 if msg_type == "conversational" else settings.PRODUCT_FLOOR
-    product_cards = _extract_product_cards(hits, threshold=card_threshold)
+    if _OOB_SIGNALS.search(message):
+        product_cards = []
+    else:
+        product_cards = _extract_product_cards(hits, threshold=card_threshold)
 
     # ── Route: skip LLM for pure lookup ────────────────────────────────────
     if msg_type == "lookup" and product_cards:

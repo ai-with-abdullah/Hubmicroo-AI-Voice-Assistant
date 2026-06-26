@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     QDRANT_LOCAL_PATH: str = ""
 
     # ── Retrieval ─────────────────────────────────────────────────────────
-    RETRIEVAL_TOP_K: int = 5
+    RETRIEVAL_TOP_K: int = 8
     BM25_WEIGHT: float = 0.3         # weight for sparse BM25 score
     DENSE_WEIGHT: float = 0.7        # weight for dense cosine score
     PRODUCT_FLOOR: float = 0.35      # min fused score to show a product card
